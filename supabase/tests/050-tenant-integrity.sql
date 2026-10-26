@@ -1,7 +1,7 @@
 -- Integridad entre espacios: una fila de un espacio no puede referenciar datos de otro.
 -- Metatests sobre el catálogo + ataques concretos.
 begin;
-select plan(7);
+select plan(10);
 
 -- Toda FK entre tablas con space_id incluye space_id (clave compuesta).
 select is(
@@ -71,6 +71,17 @@ select throws_ok(
 select throws_ok(
   format($$insert into public.goals (space_id, kind, name, target_minor, currency, person_id) values (%L, 'custom', 'x', 1, 'EUR', %L)$$, :'space_b', :'person_a'),
   '23503', null, 'un objetivo no puede apuntar a una persona de otro espacio');
+
+insert into public.pockets (space_id, name) values (:'space_b', 'Bolsillo B') returning id as pk_b \gset
+select throws_ok(
+  format($$insert into public.pocket_allocations (space_id, pocket_id, account_id, weight_bps) values (%L, %L, %L, 5000)$$, :'space_b', :'pk_b', :'acc_a'),
+  '23503', null, 'un bolsillo del espacio B no puede repartir una cuenta del espacio A');
+select throws_ok(
+  format($$insert into public.advice_rules (space_id, template, scope, pocket_id, metric, comparator, threshold, unit) values (%L, 't', 'pocket', %L, 'm', 'lt', 1, 'count')$$, :'space_a', :'pk_b'),
+  '23503', null, 'una regla del espacio A no puede apuntar a un bolsillo del espacio B');
+select throws_ok(
+  format($$insert into public.cash_rate_tiers (space_id, account_id, effective_from, rate_bps, currency, source) values (%L, %L, '2026-01-01', 100, 'EUR', 'f')$$, :'space_b', :'acc_a'),
+  '23503', null, 'un tramo de remuneración no puede apuntar a una cuenta de otro espacio');
 
 select * from finish();
 rollback;

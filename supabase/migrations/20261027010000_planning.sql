@@ -6,7 +6,7 @@
 -- =============================================================================
 
 -- ---------------------------------------------------------------------------
--- Objetivos
+-- Objetivos (el dinero asignado a cada uno vive en bolsillos: ver migración de bolsillos y reglas)
 -- ---------------------------------------------------------------------------
 create table public.goals (
   id uuid primary key default gen_random_uuid(),
@@ -29,20 +29,6 @@ comment on table public.goals is 'Objetivos (colchón, vivienda, jubilación, es
 create index goals_space_idx on public.goals (space_id, status);
 create index goals_person_idx on public.goals (space_id, person_id) where person_id is not null;
 create index goals_currency_idx on public.goals (currency);
-
--- Dinero de una cuenta reservado para un objetivo (no cuenta como "invertible").
-create table public.goal_accounts (
-  goal_id uuid not null,
-  account_id uuid not null,
-  space_id uuid not null references public.spaces (id) on delete cascade,
-  reserved_minor bigint not null default 0 check (reserved_minor between 0 and 1000000000000000),
-  primary key (goal_id, account_id),
-  foreign key (goal_id, space_id) references public.goals (id, space_id) on delete cascade,
-  foreign key (account_id, space_id) references public.accounts (id, space_id) on delete cascade
-);
-comment on table public.goal_accounts is 'Importe reservado de una cuenta para un objetivo, en la moneda de la cuenta. El colchón y el dinero de objetivos a corto plazo no se consideran invertibles.';
-create index goal_accounts_goal_idx on public.goal_accounts (space_id, goal_id);
-create index goal_accounts_account_idx on public.goal_accounts (space_id, account_id);
 
 -- ---------------------------------------------------------------------------
 -- Supuestos editables (ingresos, gasto, inflación, umbrales…)
@@ -473,7 +459,6 @@ create constraint trigger asset_compositions_validate
 do $$
 begin
   perform private.secure_space_table('goals');
-  perform private.secure_space_table('goal_accounts');
   perform private.secure_space_table('assumptions');
   perform private.secure_space_table('category_budgets');
   perform private.secure_space_table('recurring_rules');

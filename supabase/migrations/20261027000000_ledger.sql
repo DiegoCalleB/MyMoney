@@ -305,7 +305,7 @@ create table public.valuations (
   as_of date not null,
   value_minor bigint not null check (value_minor between 0 and 1000000000000000),
   currency char(3) not null references ref.currencies (code),
-  source text not null default 'manual' check (source in ('manual', 'import', 'price_feed', 'computed')),
+  source text not null default 'manual' check (source in ('manual', 'csv', 'statement', 'price_feed', 'computed')),
   note text check (char_length(note) <= 200),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),

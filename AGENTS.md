@@ -64,6 +64,9 @@ Con Docker disponible, `supabase test db` es la alternativa de mayor fidelidad p
 23. Solo datos **ficticios** en el repositorio (`supabase/seed`, *fixtures*, tests, capturas, issues, logs).
 24. Los datos reales del usuario viven en `privado/` (ignorado por git). **No leas, copies ni resumas nada de `privado/`** salvo que el usuario te lo pida en esa conversación, y nunca lo uses en tests ni lo escribas en archivos versionados.
 
+### Sencillez de uso
+25. La aplicación tiene que ser **sencilla de usar** aunque el modelo sea rico (ADR-0017): inicio con patrimonio por bolsillo y avisos activos; lo avanzado (composición, reglas, tramos, procedencia) bajo demanda; valores por defecto sensatos; configurar es opcional. Una función que obligue a entender el modelo de datos para empezar no está terminada.
+
 ## Convenciones
 
 - Commits convencionales (`feat:`, `fix:`, `docs:`, `test:`, `chore:`, `refactor:`, `sec:`). Ramas `feat/…`, `fix/…`; PR a `main` con CI verde.

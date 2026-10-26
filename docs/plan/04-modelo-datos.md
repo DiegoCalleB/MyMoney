@@ -1,12 +1,13 @@
 # 4. Modelo de datos
 
-> **Fuente de verdad: las migraciones** (`supabase/migrations/`, 4 archivos) y sus tests (`supabase/tests/`). Este documento explica el diseño; si difiere de ellas, mandan las migraciones. Revisión completa del esquema y resultados en [15-revision-bd.md](15-revision-bd.md).
+> **Fuente de verdad: las migraciones** (`supabase/migrations/`, 5 archivos) y sus tests (`supabase/tests/`). Este documento explica el diseño; si difiere de ellas, mandan las migraciones. Revisión completa del esquema y resultados en [15-revision-bd.md](15-revision-bd.md).
 >
 > **Cambios respecto al diseño inicial (decididos al implementar):**
 > - Todas las tablas tienen `space_id not null`: **no hay catálogo global de activos** (evita referencias entre espacios; un catálogo futuro irá en `ref.*`).
 > - **FKs compuestas** `(xxx_id, space_id)` en todas las relaciones entre tablas con `space_id`.
 > - `accounts.is_speculative` se sustituye por **grupos de cuentas** (`account_groups.kind = 'speculative'`); `accounts.scope` distingue cuentas del hogar de datos ajenos (`external`).
-> - `goals.reserved_minor` se sustituye por `goal_accounts.reserved_minor` (importe reservado por cuenta).
+> - El dinero de un objetivo se asigna mediante **bolsillos** (`pockets`, `pocket_allocations`); `goals.reserved_minor` y `goal_accounts` desaparecen (ADR-0017).
+> - Reglas del usuario con historial (`advice_rules`, `advice_rule_revisions`), tramos de remuneración (`cash_rate_tiers`), comisiones con fuente (`asset_fee_snapshots`) y procedencia (`entered_by`, `needs_verification`) (ADR-0017).
 > - Ingresos y gastos: `categories`, `transaction_legs.category_id`, `category_budgets`, `recurring_rules`, `categorization_rules` (ADR-0016).
 > - Escenarios con tablas propias (`scenario_*`); avisos con `level` limitado a 1-2 también en la tabla.
 > - El libro se escribe **solo por RPC**; `audit.events` se encadena **por espacio**.
@@ -224,7 +225,12 @@ Ejemplos:
 | Tabla | Columnas principales |
 |-------|----------------------|
 | `goals` | `kind` (`emergency_fund`, `home_purchase`, `retirement`, `education`, `custom`), `name`, `target_minor`, `currency`, `target_on date`, `priority smallint`, `person_id null`, `params jsonb` validado con Zod y con un *check* de `jsonb_typeof` |
-| `goal_accounts` | `goal_id`, `account_id`, `allocation_bps` |
+| `pockets` | `kind`, `name`, `target_minor`/`currency`/`target_on` (opcionales), `risk_level`, `horizon_years`, `goal_id null` |
+| `pocket_allocations` | `pocket_id`, `account_id`, `asset_id null`, `weight_bps` (suma ≤ 10000 por destino; cuenta entera o por posiciones) |
+| `advice_rules` | `template`, `scope`, `metric`, `comparator`, `threshold`, `unit`, `min_duration_days`, `severity`, `status` (activa/pausada con motivo y fecha/archivada), `version` |
+| `advice_rule_revisions` | Historial por trigger (solo lectura) |
+| `cash_rate_tiers` | `account_id`, `effective_from`, `up_to_minor null`, `rate_bps`, `source`, `needs_verification` |
+| `asset_fee_snapshots` | `asset_id`, `as_of`, `ter_bps`, `source` |
 | `assumptions` | `key` (`expected_return_equity`, `expected_return_bonds`, `expected_inflation`, `emergency_months`, `speculative_cap_bps`, `idle_cash_months`, `fee_alert_ter_bps`, `monthly_expenses_minor`…), `value numeric`, `unit`, `effective_from date`, `note`. Valores por defecto en código, con versión; el usuario los sobrescribe. |
 | `scheduled_contributions` | `account_id`, `asset_id null`, `amount_minor`, `currency`, `rrule text` (subconjunto RFC 5545: FREQ, INTERVAL, BYMONTHDAY), `start_on`, `end_on null`, `active` |
 | `risk_profiles` | `person_id`, `questionnaire_version`, `answers jsonb`, `horizon_years`, `capacity_score`, `tolerance_score`, `knowledge_score`, `completed_at`, `valid_until` |
@@ -310,7 +316,9 @@ Leyenda: **S** select, **I** insert, **U** update, **D** delete. "—" denegado.
 | `assets` | S I U D | S I U D | S | S | Sin catálogo global |
 | `transactions`, `transaction_legs` | S I U D | S I U D | S | S | Escritura mediante RPC; U/D solo en las primeras 24 h, después por inversión |
 | `valuations` | S I U D | S I U D | S | S | |
-| `goals`, `goal_accounts`, `assumptions`, `scheduled_contributions` | S I U D | S I U D | S | S | |
+| `goals`, `assumptions`, `scheduled_contributions`, `pockets`, `pocket_allocations`, `cash_rate_tiers`, `asset_fee_snapshots` | S I U D | S I U D | S | S | |
+| `advice_rules` | S I U (se archiva) | S I U | S | S | Sin borrado |
+| `advice_rule_revisions` | S | S | S | S | Lo escribe un trigger |
 | `risk_profiles` | S I U D | S I U D (de titulares) | S | S | |
 | `recommendations` | S U(estado) | S U(estado) | S | S | Inserción solo por el servidor mediante RPC que valida el nivel con *flags* |
 | `recommendation_events` | S I | S I | S I | S I | Solo inserción; sin U/D |

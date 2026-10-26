@@ -20,3 +20,6 @@ Queremos avisos útiles y explicables sin cruzar la frontera del asesoramiento e
 ## Consecuencias
 - (+) Determinista, testeable con instantáneas por perfil, auditable.
 - (−) Añadir una regla requiere desplegar; aceptable y deseable (revisión).
+
+## Actualización (ADR-0017)
+Las plantillas y métricas siguen siendo código de `finance-core`; los parámetros (umbral, ámbito, severidad) pasan a ser datos editables por el usuario en `advice_rules`, con historial. Los textos siguen saliendo solo del catálogo de mensajes.

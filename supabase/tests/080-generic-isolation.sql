@@ -45,7 +45,7 @@ end $f$;
 
 create function tests.seed_space(p_space uuid) returns void language plpgsql as $f$
 declare p1 uuid; p2 uuid; a1 uuid; a2 uuid; a3 uuid; ast uuid; g uuid; tx uuid; gl uuid; pl uuid; op uuid;
-        sc uuid; sop uuid; mp uuid; rec uuid; bt uuid; cat uuid;
+        sc uuid; sop uuid; mp uuid; rec uuid; bt uuid; cat uuid; pk uuid;
 begin
   insert into public.persons (space_id, display_name, kind) values (p_space, 'P1', 'adult') returning id into p1;
   insert into public.persons (space_id, display_name, kind) values (p_space, 'P2', 'minor') returning id into p2;
@@ -68,7 +68,13 @@ begin
   insert into public.transaction_legs (transaction_id, space_id, role, account_id, amount_minor, currency) values (tx, p_space, 'cash', a1, 100, 'EUR');
   insert into public.valuations (space_id, account_id, as_of, value_minor, currency) values (p_space, a1, '2026-01-01', 100, 'EUR');
   insert into public.goals (space_id, kind, name, target_minor, currency) values (p_space, 'custom', 'G', 1, 'EUR') returning id into gl;
-  insert into public.goal_accounts values (gl, a1, p_space, 50);
+  insert into public.pockets (space_id, name, kind, goal_id) values (p_space, 'Colchón', 'emergency', gl) returning id into pk;
+  insert into public.pocket_allocations (space_id, pocket_id, account_id, weight_bps) values (p_space, pk, a1, 5000);
+  insert into public.advice_rules (space_id, template, scope, pocket_id, metric, comparator, threshold, unit)
+    values (p_space, 'emergency_fund_months', 'pocket', pk, 'x', 'lt', 6, 'months');
+  insert into public.cash_rate_tiers (space_id, account_id, effective_from, rate_bps, currency, source)
+    values (p_space, a1, '2026-01-01', 200, 'EUR', 'fuente');
+  insert into public.asset_fee_snapshots values (ast, p_space, '2026-01-01', 10, 'ficha', false, null, now(), now());
   insert into public.assumptions (space_id, key, value, unit, effective_from) values (p_space, 'expected_inflation', 300, 'bps', '2026-01-01');
   insert into public.tasks (space_id, title) values (p_space, 't');
   insert into public.investment_plans (space_id, name, total_minor, currency, start_on) values (p_space, 'P', 100, 'EUR', '2026-01-01') returning id into pl;
