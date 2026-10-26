@@ -1,6 +1,6 @@
 # Plan de MyMoney: aplicación de finanzas personales
 
-> **Actualizaciones del 26-10-2026:** (1) ingresos y gastos entran en el MVP (ADR-0016); (2) base de datos implementada y revisada (capítulo 15); (3) instrucciones y skills agnósticas del agente (`AGENTS.md`, ADR-0015).
+> **Actualizaciones del 26-10-2026:** (1) ingresos y gastos entran en el MVP (ADR-0016); (2) base de datos implementada y revisada (capítulo 15); (3) instrucciones y skills agnósticas del agente (`AGENTS.md`, ADR-0015); (4) bolsillos, reglas del usuario, tramos de remuneración y procedencia (ADR-0017), con la sencillez de uso como requisito.
 
 > Estado: **BORRADOR PARA APROBACIÓN**. Fecha: 2026-10-26. No se escribe código de producción hasta que lo apruebes.
 > Convención usada en todo el plan:
