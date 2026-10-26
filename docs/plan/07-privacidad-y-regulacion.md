@@ -41,6 +41,8 @@ Contenido mínimo (plantilla de la AEPD "Gestión del riesgo y evaluación de im
 
 **Riesgo de categorías especiales (art. 9 RGPD)**: las descripciones de los movimientos bancarios pueden revelar salud (farmacia, clínica), afiliación sindical o política (cuotas), religión (donativos) o vida sexual. El MVP **no categoriza gasto** y permite no guardar descripciones. Si en la fase 2 se añade el presupuesto por categorías, la EIPD debe actualizarse y las categorías no deben inferir datos de art. 9 (sin categorías como "salud" detalladas por comercio; o con consentimiento explícito y separado) [A VERIFICAR con un abogado].
 
+> **Actualización (2026-10-26):** el control de ingresos y gastos entra en el MVP (ADR-0016). Salvaguardas de diseño: (1) categorías **elegidas por el usuario**, sin inferencia automática desde comercios; (2) la semilla inicial **no incluye** categorías que revelen salud, creencias, afiliación sindical o política; (3) las descripciones son opcionales, acotadas a 200 caracteres y con opción de no guardarlas al importar; (4) las reglas de categorización son deterministas y del usuario; (5) la EIPD debe actualizarse **antes de la fase 2** (otros usuarios); para uso propio y familiar rige la exención doméstica [A VERIFICAR con un abogado].
+
 ### Base legal
 
 | Tratamiento | Base | Nota |

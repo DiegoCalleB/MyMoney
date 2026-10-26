@@ -89,6 +89,20 @@ No se codifica ninguna cifra legal en la lógica: todo sale de `ref.tax_paramete
 - `foreignAssetsThreshold(accounts)`: aviso informativo cuando los saldos en el extranjero por categoría superan el umbral del modelo 720 (50.000 €) o las criptomonedas custodiadas en el extranjero superan el del modelo 721 (50.000 €) [A VERIFICAR umbrales y matices en la AEAT]. Solo informa; no determina la obligación.
 - `pensionContributionLimit(year)`: límite de aportación a planes de pensiones. [A VERIFICAR]: 1.500 € anuales individuales, ampliables con contribuciones empresariales hasta 8.500 € adicionales (total 10.000 €), según la normativa vigente que conocemos.
 
+### Ingresos y gastos (`cashflow/`)
+
+| Función | Descripción |
+|---------|-------------|
+| `monthlySummary(rows)` | Ingresos, gastos y ahorro (ingresos − gastos) por mes natural y moneda, a partir de `monthly_cashflow` |
+| `savingsRate(income, expense)` | (ingresos − gastos) / ingresos; sin ingresos ⇒ no calculable (nunca 0 % ni NaN) |
+| `essentialMonthlyExpense(totals, categories, months)` | Media mensual de las categorías `essential` en una ventana de meses completos; base del colchón |
+| `emergencyRunway(liquid, essentialMonthly)` | Meses de cobertura con el gasto básico real |
+| `budgetVariance(totals, budgets, month)` | Gasto real frente a presupuesto vigente por categoría; desviación en importe y porcentaje |
+| `categorize(description, rules)` | Primera regla del usuario que casa (por prioridad); sin coincidencia ⇒ sin categoría. Determinista; nunca infiere |
+| `forecastCashflow(recurring, from, to)` | Calendario de ingresos y gastos previstos a partir de reglas recurrentes (día 31 en meses cortos ⇒ último día) |
+
+Casos límite: mes en curso incompleto (se marca y no entra en medias), reembolsos mayores que el gasto (categoría negativa), varias monedas (nunca se suman sin conversión), meses sin datos (no cuentan como cero).
+
 ### Motor de reglas de avisos (`rules/`, ADR-0010)
 
 Cada regla es un módulo con:

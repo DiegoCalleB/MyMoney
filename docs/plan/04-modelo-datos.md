@@ -1,5 +1,17 @@
 # 4. Modelo de datos
 
+> **Fuente de verdad: las migraciones** (`supabase/migrations/`, 4 archivos) y sus tests (`supabase/tests/`). Este documento explica el diseño; si difiere de ellas, mandan las migraciones. Revisión completa del esquema y resultados en [15-revision-bd.md](15-revision-bd.md).
+>
+> **Cambios respecto al diseño inicial (decididos al implementar):**
+> - Todas las tablas tienen `space_id not null`: **no hay catálogo global de activos** (evita referencias entre espacios; un catálogo futuro irá en `ref.*`).
+> - **FKs compuestas** `(xxx_id, space_id)` en todas las relaciones entre tablas con `space_id`.
+> - `accounts.is_speculative` se sustituye por **grupos de cuentas** (`account_groups.kind = 'speculative'`); `accounts.scope` distingue cuentas del hogar de datos ajenos (`external`).
+> - `goals.reserved_minor` se sustituye por `goal_accounts.reserved_minor` (importe reservado por cuenta).
+> - Ingresos y gastos: `categories`, `transaction_legs.category_id`, `category_budgets`, `recurring_rules`, `categorization_rules` (ADR-0016).
+> - Escenarios con tablas propias (`scenario_*`); avisos con `level` limitado a 1-2 también en la tabla.
+> - El libro se escribe **solo por RPC**; `audit.events` se encadena **por espacio**.
+> - Las políticas RLS usan arrays de espacios (`private.readable_space_ids()`…) evaluados una vez por consulta.
+
 ## Principios
 
 1. **Toda tabla con datos de usuario lleva `space_id`** (salvo `profiles`, que es del usuario) y tiene RLS activada y forzada (`FORCE ROW LEVEL SECURITY`).
@@ -134,7 +146,7 @@ La aceptación se hace mediante una función RPC `accept_invitation(token)` (`se
 | `term_months` | `integer` |
 | `start_on`, `first_payment_on` | `date` |
 
-**`assets`** (`space_id` null = catálogo global de solo lectura, cargado por nosotros)
+**`assets`** (siempre con `space_id`; sin catálogo global)
 | Columna | Tipo | Notas |
 |---------|------|-------|
 | `kind` | `text` (`equity`, `etf`, `mutual_fund`, `pension_fund`, `bond`, `crypto`, `real_estate`, `commodity`, `other`) | |
@@ -295,7 +307,7 @@ Leyenda: **S** select, **I** insert, **U** update, **D** delete. "—" denegado.
 | `space_invitations` | S I U(revocar) | — | — | — | Aceptar solo mediante RPC |
 | `persons` | S I U D | S I U D | S | S | |
 | `accounts`, `account_holders`, `loan_terms` | S I U D | S I U D | S | S | |
-| `assets` (propios) | S I U D | S I U D | S | S | Catálogo global (`space_id` null): S para `authenticated` |
+| `assets` | S I U D | S I U D | S | S | Sin catálogo global |
 | `transactions`, `transaction_legs` | S I U D | S I U D | S | S | Escritura mediante RPC; U/D solo en las primeras 24 h, después por inversión |
 | `valuations` | S I U D | S I U D | S | S | |
 | `goals`, `goal_accounts`, `assumptions`, `scheduled_contributions` | S I U D | S I U D | S | S | |

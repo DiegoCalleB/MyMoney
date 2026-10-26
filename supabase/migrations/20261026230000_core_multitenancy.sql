@@ -1,8 +1,13 @@
 -- =============================================================================
--- Fase 0: multitenencia, auditoría y referencia.
--- ADR-0004 (RLS), ADR-0009 (auditoría), ADR-0011 (flags).
--- Reglas: RLS activada y forzada en toda tabla; anon sin permisos; funciones con
--- search_path vacío y nombres cualificados.
+-- 1/4 · Multitenencia, auditoría, referencia y derechos del usuario.
+-- ADR-0004 (RLS), ADR-0009 (auditoría), ADR-0011 (flags), docs/plan/15-revision-bd.md.
+--
+-- Principios:
+--  · RLS activada y FORZADA en toda tabla; anon sin ningún permiso.
+--  · Las políticas usan funciones que devuelven arrays de espacios, envueltas en
+--    (select ...): Postgres las evalúa UNA vez por consulta (InitPlan) y usa el índice
+--    por space_id, en lugar de llamar a una función por fila.
+--  · Funciones con search_path vacío y nombres cualificados.
 -- =============================================================================
 
 -- ---------------------------------------------------------------------------
@@ -13,22 +18,24 @@ create schema if not exists ref;
 create schema if not exists audit;
 
 comment on schema private is 'Funciones auxiliares de seguridad y tablas internas. No expuesto en la API.';
-comment on schema ref is 'Datos de referencia compartidos (monedas, tipos de cambio, IPC, flags).';
+comment on schema ref is 'Datos de referencia compartidos (monedas, tipos de cambio, IPC, flags). No expuesto: se lee mediante vistas de public.';
 comment on schema audit is 'Registro de auditoría inmutable. No expuesto en la API.';
 
 revoke all on schema private, ref, audit from public, anon;
 grant usage on schema private, ref to authenticated;
+grant usage on schema ref to service_role;
 
--- Supabase concede por defecto todo a anon/authenticated en public: lo quitamos para que
--- cada tabla nueva empiece denegada y los permisos se concedan de forma explícita.
+-- Supabase concede por defecto todo a anon/authenticated sobre lo que se crea en public.
+-- Lo retiramos para que cada objeto nuevo nazca denegado y los permisos sean explícitos.
 alter default privileges in schema public revoke all on tables from anon, authenticated;
 alter default privileges in schema public revoke all on sequences from anon, authenticated;
 alter default privileges in schema public revoke execute on functions from public, anon, authenticated;
-alter default privileges in schema private revoke execute on functions from public;
-alter default privileges in schema audit revoke execute on functions from public;
+-- Por defecto Postgres da EXECUTE a PUBLIC en toda función nueva: lo quitamos globalmente
+-- (para el rol que ejecuta las migraciones). Los permisos se conceden función a función.
+alter default privileges revoke execute on functions from public;
 
 create type public.app_role as enum ('owner', 'editor', 'viewer', 'advisor');
-comment on type public.app_role is 'Rol de un usuario en un espacio. advisor = asesor invitado de solo lectura con caducidad.';
+comment on type public.app_role is 'Rol en un espacio. advisor = asesor invitado de solo lectura con caducidad obligatoria.';
 
 -- ---------------------------------------------------------------------------
 -- Configuración interna
@@ -37,12 +44,12 @@ create table private.app_settings (
   key text primary key,
   value bytea not null
 );
-comment on table private.app_settings is 'Secretos internos de la base de datos (p. ej., pimienta de seudónimos de auditoría).';
+comment on table private.app_settings is 'Secretos internos de la base de datos (pimienta de seudónimos de auditoría). Solo accesible por funciones security definer.';
 alter table private.app_settings enable row level security;
 alter table private.app_settings force row level security;
+revoke all on private.app_settings from public, anon, authenticated;
 
-insert into private.app_settings (key, value)
-values ('audit_pepper', extensions.gen_random_bytes(32));
+insert into private.app_settings (key, value) values ('audit_pepper', extensions.gen_random_bytes(32));
 
 -- ---------------------------------------------------------------------------
 -- Referencia
@@ -65,7 +72,8 @@ create table ref.feature_flags (
   enabled boolean not null,
   note text,
   primary key (key, scope_type, scope_value),
-  check ((scope_type = 'global') = (scope_value = ''))
+  check ((scope_type = 'global') = (scope_value = '')),
+  check (scope_type <> 'space' or scope_value ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
 );
 comment on table ref.feature_flags is 'Feature flags. Precedencia: space > country > global (ADR-0011).';
 
@@ -75,14 +83,6 @@ insert into ref.feature_flags (key, scope_type, scope_value, enabled, note) valu
   ('reco.level2', 'country', 'ES', true, 'Plantillas de España'),
   ('reco.level3', 'global', '', false, 'Productos concretos: DESACTIVADO hasta validación legal'),
   ('ai.explanations', 'global', '', false, 'Requiere EIPD y consentimiento');
-
-alter table ref.currencies enable row level security;
-alter table ref.currencies force row level security;
-alter table ref.feature_flags enable row level security;
-alter table ref.feature_flags force row level security;
-create policy currencies_read on ref.currencies for select to authenticated using (true);
-create policy feature_flags_read on ref.feature_flags for select to authenticated using (true);
-grant select on ref.currencies, ref.feature_flags to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- Identidad y multitenencia
@@ -111,6 +111,8 @@ create table public.spaces (
   updated_at timestamptz not null default now()
 );
 comment on table public.spaces is 'Espacio (hogar, persona o cliente): unidad de aislamiento de datos.';
+create index spaces_created_by_idx on public.spaces (created_by);
+create index spaces_base_currency_idx on public.spaces (base_currency);
 
 create table public.space_members (
   space_id uuid not null references public.spaces (id) on delete cascade,
@@ -124,7 +126,9 @@ create table public.space_members (
   constraint advisor_requires_expiry check (role <> 'advisor' or expires_at is not null)
 );
 comment on table public.space_members is 'Membresía de un usuario en un espacio con su rol.';
-create index space_members_user_idx on public.space_members (user_id, space_id) include (role, expires_at);
+-- Cubre la búsqueda por usuario que hacen las funciones de autorización.
+create index space_members_user_idx on public.space_members (user_id) include (space_id, role, expires_at);
+create index space_members_invited_by_idx on public.space_members (invited_by);
 
 create table public.space_invitations (
   id uuid primary key default gen_random_uuid(),
@@ -132,7 +136,7 @@ create table public.space_invitations (
   email_normalized text check (email_normalized is null or email_normalized = lower(email_normalized)),
   role public.app_role not null,
   advisor_days smallint check (advisor_days between 1 and 30),
-  token_hash bytea not null unique,
+  token_hash bytea not null unique check (octet_length(token_hash) = 32),
   expires_at timestamptz not null,
   accepted_at timestamptz,
   accepted_by uuid references auth.users (id) on delete set null,
@@ -142,12 +146,15 @@ create table public.space_invitations (
   constraint advisor_invite_requires_days check (role <> 'advisor' or advisor_days is not null)
 );
 comment on table public.space_invitations is 'Invitaciones de un solo uso. Solo se guarda el hash del token.';
-comment on column public.space_invitations.email_normalized is 'Correo invitado; se borra al aceptar. [pii]';
+comment on column public.space_invitations.email_normalized is 'Correo invitado; se borra al aceptar, revocar o caducar. [pii]';
 create index space_invitations_space_idx on public.space_invitations (space_id);
+create index space_invitations_accepted_by_idx on public.space_invitations (accepted_by);
+create index space_invitations_created_by_idx on public.space_invitations (created_by);
 
 -- ---------------------------------------------------------------------------
--- Funciones de autorización (usadas por las políticas RLS)
+-- Funciones de autorización
 -- ---------------------------------------------------------------------------
+-- Rol vigente del usuario actual en un espacio (una sola fila): para RPC y comprobaciones puntuales.
 create function private.member_role(p_space_id uuid)
 returns public.app_role
 language sql stable security definer set search_path = ''
@@ -158,7 +165,7 @@ as $$
     and m.user_id = (select auth.uid())
     and (m.expires_at is null or m.expires_at > now());
 $$;
-comment on function private.member_role is 'Rol vigente del usuario actual en el espacio, o null. Security definer para no recursar en la RLS de space_members.';
+comment on function private.member_role is 'Rol vigente del usuario actual en el espacio, o null. security definer: lee space_members saltando su RLS para no recursar.';
 
 create function private.can_read(p_space_id uuid) returns boolean
 language sql stable set search_path = ''
@@ -172,6 +179,36 @@ create function private.is_owner(p_space_id uuid) returns boolean
 language sql stable set search_path = ''
 as $$ select coalesce(private.member_role(p_space_id) = 'owner', false); $$;
 
+-- Arrays de espacios para las políticas RLS. Se usan siempre como (select private.xxx()).
+create function private.space_ids_for_roles(p_roles public.app_role[])
+returns uuid[]
+language sql stable security definer set search_path = ''
+as $$
+  select coalesce(array_agg(m.space_id), '{}'::uuid[])
+  from public.space_members m
+  where m.user_id = (select auth.uid())
+    and m.role = any (p_roles)
+    and (m.expires_at is null or m.expires_at > now());
+$$;
+comment on function private.space_ids_for_roles is 'Espacios donde el usuario actual tiene alguno de los roles dados y acceso vigente. security definer por la misma razón que member_role.';
+
+create function private.readable_space_ids() returns uuid[]
+language sql stable set search_path = ''
+as $$ select private.space_ids_for_roles(array['owner', 'editor', 'viewer', 'advisor']::public.app_role[]); $$;
+
+create function private.peer_space_ids() returns uuid[]
+language sql stable set search_path = ''
+as $$ select private.space_ids_for_roles(array['owner', 'editor', 'viewer']::public.app_role[]); $$;
+comment on function private.peer_space_ids is 'Como readable, sin asesores: para datos que el asesor invitado no debe ver (miembros, importaciones).';
+
+create function private.writable_space_ids() returns uuid[]
+language sql stable set search_path = ''
+as $$ select private.space_ids_for_roles(array['owner', 'editor']::public.app_role[]); $$;
+
+create function private.owned_space_ids() returns uuid[]
+language sql stable set search_path = ''
+as $$ select private.space_ids_for_roles(array['owner']::public.app_role[]); $$;
+
 create function private.has_verified_mfa() returns boolean
 language sql stable security definer set search_path = ''
 as $$
@@ -181,7 +218,7 @@ as $$
   );
 $$;
 
--- Acciones sensibles: si el usuario tiene MFA, exigimos sesión AAL2.
+-- Acciones sensibles: si el usuario tiene MFA verificado, exigimos sesión AAL2.
 create function private.meets_sensitive_aal() returns boolean
 language sql stable set search_path = ''
 as $$
@@ -189,14 +226,41 @@ as $$
       or coalesce((select auth.jwt()) ->> 'aal', 'aal1') = 'aal2';
 $$;
 
-revoke execute on all functions in schema private from public, anon;
-grant execute on function
-  private.member_role(uuid), private.can_read(uuid), private.can_write(uuid),
-  private.is_owner(uuid), private.has_verified_mfa(), private.meets_sensitive_aal()
-to authenticated;
+-- ISIN: formato + dígito de control (Luhn sobre las letras convertidas a números).
+create function private.is_valid_isin(p_isin text) returns boolean
+language plpgsql immutable strict set search_path = ''
+as $$
+declare
+  v_digits text := '';
+  v_ch text;
+  v_sum integer := 0;
+  v_double boolean := false;
+  v_d integer;
+  i integer;
+begin
+  if p_isin !~ '^[A-Z]{2}[A-Z0-9]{9}[0-9]$' then
+    return false;
+  end if;
+  for i in 1..11 loop
+    v_ch := substr(p_isin, i, 1);
+    v_digits := v_digits || case when v_ch ~ '[0-9]' then v_ch else (ascii(v_ch) - 55)::text end;
+  end loop;
+  v_digits := v_digits || substr(p_isin, 12, 1);
+  for i in reverse char_length(v_digits)..1 loop
+    v_d := substr(v_digits, i, 1)::integer;
+    if v_double then
+      v_d := v_d * 2;
+      if v_d > 9 then v_d := v_d - 9; end if;
+    end if;
+    v_sum := v_sum + v_d;
+    v_double := not v_double;
+  end loop;
+  return v_sum % 10 = 0;
+end;
+$$;
 
 -- ---------------------------------------------------------------------------
--- Auditoría inmutable encadenada (ADR-0009)
+-- Auditoría inmutable, encadenada por espacio (ADR-0009)
 -- ---------------------------------------------------------------------------
 create table audit.events (
   id bigint generated always as identity primary key,
@@ -210,8 +274,8 @@ create table audit.events (
   prev_hash bytea,
   hash bytea not null
 );
-comment on table audit.events is 'Eventos de seguridad. Sin PII ni importes. Solo inserción; encadenado por hash.';
-create index audit_events_space_idx on audit.events (space_id, occurred_at desc);
+comment on table audit.events is 'Eventos de seguridad. Sin PII ni importes. Solo inserción. Una cadena de hashes por espacio (space_id nulo = cadena global).';
+create index audit_events_chain_idx on audit.events (space_id, id desc);
 alter table audit.events enable row level security;
 alter table audit.events force row level security;
 revoke all on audit.events from public, anon, authenticated;
@@ -226,6 +290,18 @@ as $$
   );
 $$;
 
+-- Contenido canónico de un evento: lo que se encadena. Misma función al escribir y al verificar.
+create function audit.canonical(
+  p_at timestamptz, p_actor bytea, p_space uuid, p_action text, p_entity text, p_entity_id text, p_metadata jsonb
+) returns bytea
+language sql immutable set search_path = ''
+as $$
+  select convert_to(jsonb_build_object(
+    'at', extract(epoch from p_at), 'actor', encode(p_actor, 'hex'), 'space', p_space,
+    'action', p_action, 'entity', p_entity, 'entity_id', p_entity_id, 'metadata', p_metadata
+  )::text, 'UTF8');
+$$;
+
 create function audit.log_event(
   p_action text, p_entity text, p_entity_id text, p_space_id uuid, p_metadata jsonb default '{}'::jsonb
 ) returns void
@@ -235,42 +311,48 @@ declare
   v_prev bytea;
   v_actor bytea;
   v_at timestamptz := clock_timestamp();
-  v_canonical text;
+  v_meta jsonb := coalesce(p_metadata, '{}'::jsonb);
 begin
-  -- Serializa las inserciones para que la cadena sea lineal.
-  perform pg_advisory_xact_lock(hashtext('audit.events'));
-  select e.hash into v_prev from audit.events e order by e.id desc limit 1;
-  v_actor := case when auth.uid() is null then null else private.pseudonymize(auth.uid()::text) end;
-  v_canonical := jsonb_build_object(
-    'at', extract(epoch from v_at), 'actor', encode(v_actor, 'hex'), 'space', p_space_id, 'action', p_action,
-    'entity', p_entity, 'entity_id', p_entity_id, 'metadata', coalesce(p_metadata, '{}'::jsonb)
-  )::text;
+  -- Serializa solo las escrituras de la misma cadena (espacio), no las de todos los espacios.
+  perform pg_advisory_xact_lock(hashtext(coalesce(p_space_id::text, 'global')));
+  select e.hash into v_prev
+  from audit.events e
+  where e.space_id is not distinct from p_space_id
+  order by e.id desc
+  limit 1;
+  v_actor := case when (select auth.uid()) is null then null
+                  else private.pseudonymize((select auth.uid())::text) end;
   insert into audit.events (occurred_at, actor_hash, space_id, action, entity, entity_id, metadata, prev_hash, hash)
   values (
-    v_at, v_actor, p_space_id, p_action, p_entity, p_entity_id, coalesce(p_metadata, '{}'::jsonb), v_prev,
-    extensions.digest(coalesce(v_prev, ''::bytea) || convert_to(v_canonical, 'UTF8'), 'sha256')
+    v_at, v_actor, p_space_id, p_action, p_entity, p_entity_id, v_meta, v_prev,
+    extensions.digest(
+      coalesce(v_prev, ''::bytea) || audit.canonical(v_at, v_actor, p_space_id, p_action, p_entity, p_entity_id, v_meta),
+      'sha256')
   );
 end;
 $$;
 comment on function audit.log_event is 'Única vía de escritura en audit.events.';
 
--- Devuelve el id del primer evento cuya cadena no cuadra, o null si está íntegra.
-create function audit.verify_chain() returns bigint
+-- Primer evento cuya cadena no cuadra en un espacio (null = íntegra). Tolera que el inicio
+-- de la cadena se haya purgado por retención: el primer evento fija el ancla.
+create function audit.verify_chain(p_space_id uuid default null) returns bigint
 language plpgsql stable security definer set search_path = ''
 as $$
 declare
   r record;
-  v_prev bytea := null;
-  v_expected bytea;
+  v_prev bytea;
+  v_first boolean := true;
 begin
-  for r in select * from audit.events order by id loop
-    v_expected := extensions.digest(
-      coalesce(v_prev, ''::bytea) || convert_to(jsonb_build_object(
-        'at', extract(epoch from r.occurred_at), 'actor', encode(r.actor_hash, 'hex'), 'space', r.space_id,
-        'action', r.action, 'entity', r.entity, 'entity_id', r.entity_id, 'metadata', r.metadata
-      )::text, 'UTF8'),
-      'sha256');
-    if r.prev_hash is distinct from v_prev or r.hash <> v_expected then
+  for r in select * from audit.events e where e.space_id is not distinct from p_space_id order by e.id loop
+    if v_first then
+      v_prev := r.prev_hash;
+      v_first := false;
+    end if;
+    if r.prev_hash is distinct from v_prev
+       or r.hash <> extensions.digest(
+            coalesce(v_prev, ''::bytea)
+            || audit.canonical(r.occurred_at, r.actor_hash, r.space_id, r.action, r.entity, r.entity_id, r.metadata),
+            'sha256') then
       return r.id;
     end if;
     v_prev := r.hash;
@@ -279,19 +361,57 @@ begin
 end;
 $$;
 
--- Las tablas de auditoría no admiten cambios ni borrados, ni siquiera por el propietario.
+-- Verifica todas las cadenas; devuelve (espacio, primer evento roto) solo de las rotas.
+create function audit.verify_all() returns table (space_id uuid, first_bad_id bigint)
+language plpgsql stable security definer set search_path = ''
+as $$
+declare
+  r record;
+  v_bad bigint;
+begin
+  for r in select distinct e.space_id as sid from audit.events e loop
+    v_bad := audit.verify_chain(r.sid);
+    if v_bad is not null then
+      space_id := r.sid;
+      first_bad_id := v_bad;
+      return next;
+    end if;
+  end loop;
+end;
+$$;
+
+-- Retención: único camino para borrar eventos (los disparadores lo bloquean en cualquier otro caso).
+create function audit.purge_older_than(p_age interval default interval '2 years') returns bigint
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_count bigint;
+begin
+  perform set_config('audit.allow_purge', 'on', true);
+  delete from audit.events e where e.occurred_at < now() - p_age;
+  get diagnostics v_count = row_count;
+  perform set_config('audit.allow_purge', 'off', true);
+  return v_count;
+end;
+$$;
+
 create function audit.forbid_mutation() returns trigger
 language plpgsql set search_path = ''
-as $$ begin raise exception 'audit.events es de solo inserción' using errcode = 'insufficient_privilege'; end; $$;
+as $$
+begin
+  if tg_op = 'DELETE' and coalesce(current_setting('audit.allow_purge', true), 'off') = 'on' then
+    return old;
+  end if;
+  raise exception 'audit.events es de solo inserción' using errcode = 'insufficient_privilege';
+end;
+$$;
 create trigger audit_events_immutable before update or delete on audit.events
   for each row execute function audit.forbid_mutation();
 create trigger audit_events_no_truncate before truncate on audit.events
   for each statement execute function audit.forbid_mutation();
 
-revoke execute on all functions in schema audit from public, anon, authenticated;
-
 -- ---------------------------------------------------------------------------
--- Disparadores de mantenimiento
+-- Disparadores genéricos
 -- ---------------------------------------------------------------------------
 create function private.touch_updated_at() returns trigger
 language plpgsql set search_path = ''
@@ -304,7 +424,7 @@ create trigger spaces_touch before update on public.spaces
 create trigger space_members_touch before update on public.space_members
   for each row execute function private.touch_updated_at();
 
--- Perfil automático al registrarse.
+-- Perfil automático al registrarse (create_space y accept_invitation lo garantizan además).
 create function private.handle_new_user() returns trigger
 language plpgsql security definer set search_path = ''
 as $$
@@ -391,10 +511,8 @@ $$;
 create trigger space_invitations_audit after insert or update on public.space_invitations
   for each row execute function private.audit_invitations();
 
-revoke execute on all functions in schema private from public, anon;
-
 -- ---------------------------------------------------------------------------
--- RLS
+-- RLS y permisos
 -- ---------------------------------------------------------------------------
 alter table public.profiles enable row level security;
 alter table public.profiles force row level security;
@@ -404,15 +522,24 @@ alter table public.space_members enable row level security;
 alter table public.space_members force row level security;
 alter table public.space_invitations enable row level security;
 alter table public.space_invitations force row level security;
+alter table ref.currencies enable row level security;
+alter table ref.currencies force row level security;
+alter table ref.feature_flags enable row level security;
+alter table ref.feature_flags force row level security;
 
--- profiles: el propio perfil; y el de quien comparte espacio conmigo (salvo si soy asesor).
+-- ref: lectura para usuarios; escritura solo por service_role/postgres (saltan RLS).
+create policy currencies_read on ref.currencies for select to authenticated using (true);
+-- Las flags de ámbito "space" solo las ve quien pertenece a ese espacio (no se filtran ids ajenos).
+create policy feature_flags_read on ref.feature_flags for select to authenticated
+using (scope_type <> 'space' or scope_value = any ((select private.readable_space_ids())::text[]));
+
+-- profiles: el propio perfil y el de quien comparte espacio conmigo (sin contar asesores).
 create policy profiles_select on public.profiles for select to authenticated
 using (
   user_id = (select auth.uid())
-  or exists (
-    select 1 from public.space_members theirs
-    where theirs.user_id = profiles.user_id
-      and private.member_role(theirs.space_id) in ('owner', 'editor', 'viewer')
+  or user_id in (
+    select m.user_id from public.space_members m
+    where m.space_id = any ((select private.peer_space_ids())::uuid[])
   )
 );
 create policy profiles_update on public.profiles for update to authenticated
@@ -421,36 +548,33 @@ using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()))
 -- spaces: lectura para miembros; cambios y borrado solo propietarios con AAL suficiente.
 -- La creación es solo mediante la RPC create_space.
 create policy spaces_select on public.spaces for select to authenticated
-using (private.can_read(id));
+using (id = any ((select private.readable_space_ids())::uuid[]));
 create policy spaces_update on public.spaces for update to authenticated
-using (private.is_owner(id) and private.meets_sensitive_aal())
-with check (private.is_owner(id));
+using (id = any ((select private.owned_space_ids())::uuid[]) and (select private.meets_sensitive_aal()))
+with check (id = any ((select private.owned_space_ids())::uuid[]));
 create policy spaces_delete on public.spaces for delete to authenticated
-using (private.is_owner(id) and private.meets_sensitive_aal());
+using (id = any ((select private.owned_space_ids())::uuid[]) and (select private.meets_sensitive_aal()));
 
 -- space_members: el asesor solo ve su propia fila.
 create policy space_members_select on public.space_members for select to authenticated
-using (
-  user_id = (select auth.uid())
-  or private.member_role(space_id) in ('owner', 'editor', 'viewer')
-);
+using (user_id = (select auth.uid()) or space_id = any ((select private.peer_space_ids())::uuid[]));
 create policy space_members_update on public.space_members for update to authenticated
-using (private.is_owner(space_id) and private.meets_sensitive_aal())
-with check (private.is_owner(space_id));
+using (space_id = any ((select private.owned_space_ids())::uuid[]) and (select private.meets_sensitive_aal()))
+with check (space_id = any ((select private.owned_space_ids())::uuid[]));
 create policy space_members_delete on public.space_members for delete to authenticated
 using (
   user_id = (select auth.uid())
-  or (private.is_owner(space_id) and private.meets_sensitive_aal())
+  or (space_id = any ((select private.owned_space_ids())::uuid[]) and (select private.meets_sensitive_aal()))
 );
 
--- space_invitations: solo propietarios; creación y aceptación mediante RPC.
+-- space_invitations: solo propietarios; la creación y la aceptación van por RPC.
 create policy space_invitations_select on public.space_invitations for select to authenticated
-using (private.is_owner(space_id));
+using (space_id = any ((select private.owned_space_ids())::uuid[]));
 create policy space_invitations_revoke on public.space_invitations for update to authenticated
-using (private.is_owner(space_id) and accepted_at is null)
-with check (private.is_owner(space_id));
+using (space_id = any ((select private.owned_space_ids())::uuid[]) and accepted_at is null)
+with check (space_id = any ((select private.owned_space_ids())::uuid[]));
 
--- Permisos de columna: lo que no se concede, no se puede tocar aunque la política lo permita.
+-- Permisos: lo que no se concede no se puede tocar aunque la política lo permitiera.
 revoke all on public.profiles, public.spaces, public.space_members, public.space_invitations
   from public, anon, authenticated;
 grant select on public.profiles to authenticated;
@@ -463,8 +587,19 @@ grant select (id, space_id, role, advisor_days, expires_at, accepted_at, revoked
   on public.space_invitations to authenticated;
 grant update (revoked_at) on public.space_invitations to authenticated;
 
+revoke all on ref.currencies, ref.feature_flags from public, anon, authenticated;
+grant select on ref.currencies, ref.feature_flags to authenticated;
+
+-- ref no está expuesto en la API: se lee mediante vistas de public con los permisos del invocador.
+create view public.currencies with (security_invoker = true) as
+  select code, minor_units from ref.currencies;
+comment on view public.currencies is 'Monedas soportadas (lectura).';
+revoke all on public.currencies from public, anon, authenticated;
+grant select on public.currencies to authenticated;
+
 -- ---------------------------------------------------------------------------
--- RPC públicas (security definer justificado: crean filas que el usuario aún no puede ver)
+-- RPC públicas. security definer justificado: crean filas que el usuario aún no puede
+-- ver/escribir por RLS; todas comprueban permisos de forma explícita.
 -- ---------------------------------------------------------------------------
 create function public.create_space(
   p_name text,
@@ -476,7 +611,7 @@ create function public.create_space(
 language plpgsql security definer set search_path = ''
 as $$
 declare
-  v_uid uuid := auth.uid();
+  v_uid uuid := (select auth.uid());
   v_space uuid;
 begin
   if v_uid is null then
@@ -488,6 +623,7 @@ begin
   if (select count(*) from public.space_members m where m.user_id = v_uid and m.role = 'owner') >= 20 then
     raise exception 'Límite de espacios alcanzado' using errcode = 'program_limit_exceeded';
   end if;
+  insert into public.profiles (user_id) values (v_uid) on conflict do nothing;
   insert into public.spaces (name, kind, country_code, base_currency, timezone, created_by)
   values (p_name, p_kind, p_country_code, p_base_currency, p_timezone, v_uid)
   returning id into v_space;
@@ -521,7 +657,7 @@ begin
   insert into public.space_invitations (space_id, email_normalized, role, advisor_days, token_hash, expires_at, created_by)
   values (p_space_id, v_email, p_role,
           case when p_role = 'advisor' then coalesce(p_advisor_days, 30::smallint) end,
-          extensions.digest(v_token, 'sha256'), now() + interval '72 hours', auth.uid());
+          extensions.digest(v_token, 'sha256'), now() + interval '72 hours', (select auth.uid()));
   return translate(encode(v_token, 'base64'), '+/=', '-_');
 end;
 $$;
@@ -530,7 +666,7 @@ create function public.accept_invitation(p_token text) returns uuid
 language plpgsql security definer set search_path = ''
 as $$
 declare
-  v_uid uuid := auth.uid();
+  v_uid uuid := (select auth.uid());
   v_email text := lower((select auth.jwt()) ->> 'email');
   v_inv public.space_invitations;
   v_hash bytea;
@@ -554,6 +690,7 @@ begin
   if exists (select 1 from public.space_members m where m.space_id = v_inv.space_id and m.user_id = v_uid) then
     raise exception 'Ya eres miembro de este espacio' using errcode = 'unique_violation';
   end if;
+  insert into public.profiles (user_id) values (v_uid) on conflict do nothing;
   insert into public.space_members (space_id, user_id, role, expires_at, invited_by)
   values (v_inv.space_id, v_uid, v_inv.role,
           case when v_inv.role = 'advisor' then now() + make_interval(days => v_inv.advisor_days) end,
@@ -579,7 +716,72 @@ as $$
     false) end;
 $$;
 
-revoke execute on function public.create_space, public.create_invitation, public.accept_invitation,
-  public.feature_enabled from public, anon;
-grant execute on function public.create_space, public.create_invitation, public.accept_invitation,
-  public.feature_enabled to authenticated;
+-- Derecho de supresión (RGPD art. 17): borra al usuario de verdad. Sin necesitar la clave secreta
+-- en la web. Los espacios donde es el único propietario se borran con todos sus datos.
+create function public.delete_my_account() returns void
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_uid uuid := (select auth.uid());
+  v_space uuid;
+begin
+  if v_uid is null then
+    raise exception 'No autenticado' using errcode = 'insufficient_privilege';
+  end if;
+  if not private.meets_sensitive_aal() then
+    raise exception 'Requiere verificación MFA reciente' using errcode = 'insufficient_privilege';
+  end if;
+  for v_space in
+    select m.space_id from public.space_members m
+    where m.user_id = v_uid and m.role = 'owner'
+      and not exists (
+        select 1 from public.space_members o
+        where o.space_id = m.space_id and o.role = 'owner' and o.user_id <> v_uid)
+  loop
+    delete from public.spaces s where s.id = v_space;
+  end loop;
+  perform audit.log_event('account.deleted', 'user', encode(private.pseudonymize(v_uid::text), 'hex'), null, '{}'::jsonb);
+  delete from auth.users u where u.id = v_uid;
+end;
+$$;
+comment on function public.delete_my_account is 'Borrado real de la cuenta del usuario actual y de los espacios que solo él posee.';
+
+-- Mantenimiento programado (pg_cron o una función programada): sin permisos para usuarios.
+create function private.purge_expired() returns jsonb
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_blanked bigint;
+  v_deleted bigint;
+begin
+  update public.space_invitations i set email_normalized = null
+   where i.email_normalized is not null and (i.expires_at < now() or i.revoked_at is not null);
+  get diagnostics v_blanked = row_count;
+  delete from public.space_invitations i
+   where coalesce(i.accepted_at, i.revoked_at, i.expires_at) < now() - interval '90 days';
+  get diagnostics v_deleted = row_count;
+  return jsonb_build_object('invitation_emails_cleared', v_blanked, 'invitations_deleted', v_deleted);
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Permisos de ejecución (denegado por defecto; solo lo listado)
+-- ---------------------------------------------------------------------------
+revoke execute on all functions in schema private from public, anon, authenticated;
+revoke execute on all functions in schema audit from public, anon, authenticated;
+revoke execute on function
+  public.create_space, public.create_invitation, public.accept_invitation,
+  public.feature_enabled, public.delete_my_account
+from public, anon;
+
+grant execute on function
+  private.member_role(uuid), private.can_read(uuid), private.can_write(uuid), private.is_owner(uuid),
+  private.space_ids_for_roles(public.app_role[]),
+  private.readable_space_ids(), private.peer_space_ids(), private.writable_space_ids(), private.owned_space_ids(),
+  private.has_verified_mfa(), private.meets_sensitive_aal(), private.is_valid_isin(text)
+to authenticated;
+
+grant execute on function
+  public.create_space, public.create_invitation, public.accept_invitation,
+  public.feature_enabled, public.delete_my_account
+to authenticated;

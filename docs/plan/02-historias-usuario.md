@@ -4,6 +4,8 @@ Prioridad MoSCoW dentro de cada fase. Formato: *Como … quiero … para …*, s
 
 ## Fase 1: MVP personal
 
+> **Cambio de alcance (2026-10-26):** el control de ingresos y gastos pasa al MVP (épica G). La base de datos ya lo soporta (ADR-0016).
+
 ### Épica A: Cuenta, espacios y acceso
 
 **HU-01 (Must). Registro e inicio de sesión seguros.**
@@ -131,6 +133,29 @@ Como inversor con activos en USD quiero ver todo en EUR con el tipo de cambio de
 **HU-23 (Must). Ver la actividad de seguridad.**
 - Inicios de sesión recientes, dispositivos y sesiones activas, con la opción de cerrar las demás sesiones.
 
+### Épica G: Ingresos y gastos
+
+**HU-24 (Must). Categorías.**
+Como usuario quiero categorizar mis ingresos y gastos para saber en qué se va mi dinero.
+- Categorías iniciales neutras (18) creadas con un clic; el usuario crea, renombra y archiva las suyas (dos niveles).
+- Ninguna categoría inicial revela datos de categoría especial (salud, donaciones, cuotas sindicales o políticas); si el usuario las crea, la app lo avisa.
+- Un gasto puede dividirse en varias categorías (ticket de supermercado: alimentación + hogar). Un reembolso resta de su categoría.
+
+**HU-25 (Must). Ingresos y gastos sin confundirlos con movimientos de patrimonio.**
+- Traspasos entre mis cuentas, aportaciones a inversión y compras de fondos **nunca** cuentan como gasto o ingreso (test de base de datos).
+- El pago de la tarjeta de crédito no duplica los gastos ya registrados con la tarjeta.
+
+**HU-26 (Must). Resumen mensual.**
+- Ingresos, gastos, ahorro (ingresos − gastos) y tasa de ahorro por mes natural; gasto por categoría; comparación con el mes anterior y con el presupuesto.
+- Distingue gasto básico (esencial) del resto: base del colchón de emergencia calculado con el gasto **real**, no con una cifra estimada.
+
+**HU-27 (Should). Presupuestos y recurrentes.**
+- Presupuesto mensual por categoría con vigencia; avisos de desviación (nivel 2, sin productos).
+- Ingresos y gastos recurrentes (nómina, alquiler, suscripciones) para previsión de caja; no crean movimientos solos: el usuario los confirma.
+
+**HU-28 (Should). Reglas de categorización.**
+- Reglas deterministas elegidas por el usuario ("contiene X ⇒ categoría Y") aplicadas al importar. Sin inferencia automática ni aprendizaje con descripciones.
+
 ## Fase 2: grupo cerrado de amigos
 
 | ID | Prioridad | Historia | Criterio clave |
@@ -139,7 +164,6 @@ Como inversor con activos en USD quiero ver todo en EUR con el tipo de cambio de
 | HU-31 | Must | Onboarding guiado por perfil | Un usuario nuevo llega a ver su patrimonio en menos de 10 minutos con datos manuales |
 | HU-32 | Must | Plantillas de importación para las entidades más usadas | 5-8 entidades con tests de fixtures anonimizados |
 | HU-33 | Should | Lotes fiscales FIFO y plusvalías estimadas | Coincide con casos resueltos a mano y revisados; regla de los dos meses detectada como aviso |
-| HU-34 | Should | Presupuestos y categorías de gasto | Ver nota de datos de categoría especial en la sección 7 |
 | HU-35 | Should | Proyecciones con rangos (Monte Carlo) | Semilla reproducible; percentiles 10/50/90 con supuestos visibles |
 | HU-36 | Should | Notificaciones por correo (resumen mensual, compras programadas) | Sin cifras en el correo; solo un enlace a la app |
 | HU-37 | Could | Explicaciones con IA de avisos ya generados | Solo reformula; guardarraíles y registro (sección 7) |

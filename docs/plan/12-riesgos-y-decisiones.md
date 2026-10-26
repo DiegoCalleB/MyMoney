@@ -10,7 +10,7 @@
 | R4 | **Brecha de seguridad con notificación a la AEPD** | Crítico | Baja | Capítulo 6; MFA; mínimos privilegios; plan de incidentes ensayado | Alertas de autenticación; dependencias vulnerables sin parchear |
 | R5 | **Pérdida de datos** | Alto | Baja | Copias, PITR, pruebas de restauración, migraciones expandir/contraer | Prueba de restauración no hecha en el trimestre |
 | R6 | **Fricción de entrada de datos**: se abandona el uso | Alto para el producto | Alta | Importación pronto, valoraciones rápidas, plantillas por entidad; PSD2 en la fase 3 | Valoraciones de más de 60 días en la mayoría de cuentas |
-| R7 | **Datos de categoría especial inferidos de descripciones** | Alto (RGPD) | Media si se categoriza el gasto | No categorizar en el MVP; descripciones opcionales y recortadas; EIPD | Decisión de añadir presupuestos sin actualizar la EIPD |
+| R7 | **Datos de categoría especial inferidos o revelados por categorías y descripciones** (ahora que hay ingresos y gastos en el MVP) | Alto (RGPD) | Media | Categorías elegidas por el usuario, semilla neutra, sin inferencia, descripciones opcionales y acotadas, EIPD actualizada antes de la fase 2 | Una categoría o regla que nombre salud, creencias o afiliaciones |
 | R8 | **Parámetros fiscales desactualizados o mal interpretados** | Medio-alto | Media | Parámetros por ejercicio con fuente y fecha de verificación; fiscalidad solo informativa; revisión anual en enero | Parámetro sin `verified_on` del ejercicio en curso |
 | R9 | **Dependencia de un proveedor** (Supabase, hosting) | Medio | Baja | Postgres estándar, migraciones SQL propias, sin funciones exclusivas en el dominio; plan B autoalojado documentado | Cambios de precio o condiciones |
 | R10 | **Alcance que crece** (módulos personales, IA, app nativa) | Medio | Alta | Hoja de ruta con criterios de salida; "qué no haremos"; módulos detrás de *flags* | Funciones de fase 2-3 colándose en el MVP |
@@ -28,7 +28,7 @@
 | D4 | Supabase Pro desde el día 1 | Gratis + copias propias / Pro | Pro desde que haya datos reales (copias y sin pausa) | Fase 1, iteración 1 | Pregunta 9 |
 | D5 | PITR | Sí desde la fase 2 / copias lógicas horarias | PITR desde la fase 2 | Inicio de la fase 2 | Número de usuarios |
 | D6 | Profundidad fiscal | Informativa / FIFO y plusvalías | Informativa en el MVP, FIFO en la fase 2 | Fase 1 | Pregunta 6 |
-| D7 | Gasto y presupuestos | MVP / fase 2 / nunca | Fase 2 con EIPD actualizada | Fase 2 | Pregunta 7 |
+| D7 | Gasto y presupuestos | MVP / fase 2 / nunca | **Decidido: MVP** (petición del usuario, 26-10-2026); EIPD antes de la fase 2 | Fase 1 | Pregunta 7 resuelta |
 | D8 | IA generativa | Nunca / explicaciones en la fase 2 / asistente | Explicaciones en la fase 2 tras la evaluación | Fase 2 | EIPD, coste |
 | D9 | Librería decimal | decimal.js / big.js / implementación propia sobre `bigint` | decimal.js (madura, precisión y modos de redondeo configurables) [A VERIFICAR versión y mantenimiento en la fase 0] | Fase 0 | — |
 | D10 | Proveedor de correo y de errores | Varios con región UE | El que tenga región UE y DPA claros | Fase 0-1 | Pregunta 5 |

@@ -13,7 +13,9 @@
     "test": "pnpm -r test",
     "test:db": "bash scripts/db-test-local.sh",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "agents:sync": "node scripts/sync-agent-files.mjs",
+    "agents:check": "node scripts/sync-agent-files.mjs --check"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

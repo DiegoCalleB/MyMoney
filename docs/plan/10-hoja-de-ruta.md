@@ -13,7 +13,7 @@ Entregables:
 - Tests pgTAP de aislamiento entre espacios y test de meta-cobertura de RLS.
 - Next.js con autenticación (registro, verificación, inicio de sesión, MFA TOTP), cabeceras de seguridad y CSP, *logger* sin PII, limitador.
 - `finance-core` con `Money`, `allocate`, `convert` y su batería de propiedades.
-- `CLAUDE.md`, ADR aceptados, lista ASVS iniciada, plantilla de EIPD.
+- `AGENTS.md` (instrucciones para cualquier agente), skills en `.agents/skills/`, ADR aceptados, lista ASVS iniciada, plantilla de EIPD.
 
 **Criterios de salida**: CI verde; un usuario no puede ver otro espacio (pgTAP + E2E); CSP sin `unsafe-inline` en scripts; ningún secreto en el repositorio (escaneo limpio); puntuación A en un escáner de cabeceras.
 
@@ -27,7 +27,7 @@ Iteraciones (2 semanas cada una):
 1. Cuentas, titulares, movimientos con patas, valoraciones, tipos del BCE → patrimonio neto (HU-04/05/06/08/09).
 2. Aportado frente a ganado, XIRR, TWR, IPC del INE, historial con patrimonio tras cada acción (HU-10/11/12).
 3. Importación CSV idempotente con mapeo; plantillas de tus 2-3 entidades (HU-07).
-4. Objetivos (colchón, vivienda), compras programadas, simulador de caídas, comisiones (HU-13 a 16, 18).
+4. Objetivos (colchón, vivienda), compras programadas, simulador de caídas, comisiones (HU-13 a 16, 18) **e ingresos y gastos: categorías, resumen mensual y presupuestos (HU-24 a 28)**. Si el calendario aprieta, HU-27 y HU-28 pasan a la iteración siguiente.
 5. Avisos de nivel 1-2, perfil, exportar, borrar, actividad de seguridad (HU-19 a 23). Producción.
 
 **Criterios de salida**:
@@ -49,7 +49,7 @@ Entregables:
 - Alta por invitación (HU-30), onboarding (HU-31), plantillas de 5-8 entidades (HU-32).
 - PITR en producción; limitador distribuido si hace falta; alertas completas.
 - Fiscalidad informativa (HU-39) y, si se aprueba, lotes FIFO (HU-33).
-- Presupuestos (HU-34), si la pregunta 7 lo pide, con la EIPD actualizada.
+- EIPD actualizada con ingresos y gastos (categorías, descripciones) antes de invitar a nadie.
 - Proyecciones Monte Carlo (HU-35); resumen mensual por correo sin cifras (HU-36).
 - Evaluación de IA para explicaciones (HU-37) **solo** tras la EIPD y con consentimiento.
 - Prueba de accesibilidad con usuarios reales (incluida una persona mayor) y prueba de penetración ligera (externa si el presupuesto lo permite).

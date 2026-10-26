@@ -2,13 +2,13 @@
 begin;
 select plan(29);
 
-select tests.create_user('ana@example.test') as ana \gset
+select tests.create_user('alicia@example.test') as alicia \gset
 select tests.create_user('eva@example.test') as eva \gset
 select tests.create_user('vic@example.test') as vic \gset
 select tests.create_user('aser@example.test') as aser \gset
 select tests.create_user('intruso@example.test') as intruso \gset
 
-select tests.authenticate_as(:'ana');
+select tests.authenticate_as(:'alicia');
 select public.create_space('Familia') as space \gset
 select public.create_invitation(:'space', 'EVA@example.test', 'editor') as tok_eva \gset
 select public.create_invitation(:'space', 'vic@example.test', 'viewer') as tok_vic \gset
@@ -63,20 +63,20 @@ select tests.as_postgres();
 select throws_ok(format($$update public.space_members set expires_at = null where user_id = %L$$, :'aser'), '23514', null, 'un asesor siempre tiene caducidad');
 
 -- Último propietario.
-select tests.authenticate_as(:'ana');
-select throws_ok(format('delete from public.space_members where space_id = %L and user_id = %L', :'space', :'ana'),
+select tests.authenticate_as(:'alicia');
+select throws_ok(format('delete from public.space_members where space_id = %L and user_id = %L', :'space', :'alicia'),
   '23514', 'Un espacio debe tener al menos un propietario', 'la última propietaria no puede irse dejando miembros');
-select throws_ok(format($$update public.space_members set role = 'editor' where space_id = %L and user_id = %L$$, :'space', :'ana'),
+select throws_ok(format($$update public.space_members set role = 'editor' where space_id = %L and user_id = %L$$, :'space', :'alicia'),
   '23514', 'Un espacio debe tener al menos un propietario', 'la última propietaria no puede degradarse');
 select is((select count(*)::int from (
   select 1 from public.space_members where space_id = :'space' and user_id = :'vic') x), 1, 'Vic sigue en el espacio');
-select ok(exists(select 1 from public.space_members where user_id = :'ana' and role = 'owner'), 'Ana sigue siendo propietaria');
+select ok(exists(select 1 from public.space_members where user_id = :'alicia' and role = 'owner'), 'Alicia sigue siendo propietaria');
 
 -- AAL2: con MFA verificado, las acciones sensibles exigen sesión aal2.
-select tests.verify_mfa(:'ana');
-select tests.authenticate_as(:'ana', 'aal1');
+select tests.verify_mfa(:'alicia');
+select tests.authenticate_as(:'alicia', 'aal1');
 select is_empty(format($$update public.spaces set name = 'Renombrado' where id = %L returning 1$$, :'space'), 'con MFA y sesión aal1 no se cambia el espacio');
-select tests.authenticate_as(:'ana', 'aal2');
+select tests.authenticate_as(:'alicia', 'aal2');
 select isnt_empty(format($$update public.spaces set name = 'Renombrado' where id = %L returning 1$$, :'space'), 'con sesión aal2 sí');
 
 -- Un espacio que se queda sin miembros se borra.

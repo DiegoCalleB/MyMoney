@@ -43,6 +43,11 @@ export default tseslint.config(
     },
   },
   {
+    // Scripts de Node (sin dependencias): globales de Node declarados explícitamente.
+    files: ["scripts/**/*.mjs"],
+    languageOptions: { globals: { console: "readonly", process: "readonly" } },
+  },
+  {
     files: ["**/*.mjs", "**/*.config.ts"],
     ...tseslint.configs.disableTypeChecked,
   },

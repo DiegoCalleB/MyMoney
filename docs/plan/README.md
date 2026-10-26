@@ -1,5 +1,7 @@
 # Plan de MyMoney: aplicación de finanzas personales
 
+> **Actualizaciones del 26-10-2026:** (1) ingresos y gastos entran en el MVP (ADR-0016); (2) base de datos implementada y revisada (capítulo 15); (3) instrucciones y skills agnósticas del agente (`AGENTS.md`, ADR-0015).
+
 > Estado: **BORRADOR PARA APROBACIÓN**. Fecha: 2026-10-26. No se escribe código de producción hasta que lo apruebes.
 > Convención usada en todo el plan:
 > - **[HECHO]**: dato verificable con fuente citada.
@@ -26,6 +28,7 @@
 | 12 | [12-riesgos-y-decisiones.md](12-riesgos-y-decisiones.md) | Riesgos y decisiones pendientes por impacto |
 | 13 | [13-estructura-repositorio.md](13-estructura-repositorio.md) | Estructura del monorepo y `CLAUDE.md` inicial |
 | 14 | [14-caso-de-referencia.md](14-caso-de-referencia.md) | Forma del primer hogar (sin datos reales) y requisitos que añade |
+| 15 | [15-revision-bd.md](15-revision-bd.md) | Revisión de la base de datos: hallazgos, decisiones, pruebas y rendimiento |
 | — | [../adr/](../adr/) | Registros de decisiones de arquitectura (ADR) |
 
 ## Resumen ejecutivo

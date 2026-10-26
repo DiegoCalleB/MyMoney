@@ -18,3 +18,6 @@ supabase/.branches/
 privado/
 *.real.md
 *.real.csv
+
+# Generado por scripts/concat-migrations.sh
+supabase/dist/

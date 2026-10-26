@@ -1,0 +1,3 @@
+# Aider no lee AGENTS.md por defecto: lo cargamos como convención de solo lectura.
+read:
+  - AGENTS.md

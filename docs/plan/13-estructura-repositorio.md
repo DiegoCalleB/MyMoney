@@ -1,10 +1,13 @@
-# 13. Estructura del repositorio y `CLAUDE.md`
+# 13. Estructura del repositorio y `AGENTS.md`
 
 ## Estructura propuesta (monorepo `pnpm`, ADR-0013)
 
 ```
 MyMoney/
-├── CLAUDE.md                      # Convenciones, comandos y reglas de seguridad (ya creado)
+├── AGENTS.md                      # ÚNICA fuente de instrucciones para cualquier agente (ya creado)
+├── CLAUDE.md  GEMINI.md  .aider.conf.yml  .gemini/settings.json   # solo apuntan a AGENTS.md
+├── .agents/skills/                # skills (formato abierto Agent Skills): fuente única
+├── .claude/skills  .github/skills  .agent/skills   # réplicas generadas (pnpm agents:sync)
 ├── README.md
 ├── package.json                   # Scripts raíz; "packageManager" fijado
 ├── pnpm-workspace.yaml
@@ -73,6 +76,6 @@ Reglas de dependencia (comprobadas con lint de importaciones):
 - `apps/web/src/components` no importa `server/`.
 - Solo `supabase/functions` puede leer la variable de la clave secreta.
 
-## `CLAUDE.md` inicial
+## `AGENTS.md` y skills multiagente
 
-Creado en la raíz del repositorio: [`/CLAUDE.md`](../../CLAUDE.md). Se actualizará al terminar la fase 0 con los comandos reales.
+`AGENTS.md` (raíz) contiene comandos, reglas no negociables y convenciones; lo leen directamente Codex, Cursor, Copilot, OpenCode y Antigravity, y el resto mediante un archivo puntero (`CLAUDE.md` con `@AGENTS.md`, `GEMINI.md` + `.gemini/settings.json`, `.aider.conf.yml`). Las skills viven en `.agents/skills/` y `scripts/sync-agent-files.mjs` las replica a las rutas propias de cada herramienta; el CI falla si las réplicas se desincronizan (`pnpm agents:check`). Decisión y fuentes: [ADR-0015](../adr/0015-instrucciones-multiagente.md).
