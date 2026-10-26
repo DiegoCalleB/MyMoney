@@ -54,7 +54,7 @@ supabase db reset        # recrea la BD local con migraciones y semilla ficticia
 19. No decir "test de idoneidad" ni "asesoramiento"; usar "perfil financiero" y "avisos".
 
 ### Datos de prueba
-20. Solo datos ficticios (semilla de `supabase/seed`). Prohibido pegar extractos, saldos o nombres reales en el repositorio, issues, tests o prompts.
+20. Solo datos ficticios (semilla de `supabase/seed`). Los datos reales del usuario viven en `privado/` (ignorado por git): no leerlos para tests, no copiarlos a ningún archivo versionado, issue, log ni prompt de CI.
 
 ## Convenciones
 

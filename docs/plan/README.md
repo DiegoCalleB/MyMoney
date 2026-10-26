@@ -25,6 +25,7 @@
 | 11 | [11-costes.md](11-costes.md) | Costes estimados por fase |
 | 12 | [12-riesgos-y-decisiones.md](12-riesgos-y-decisiones.md) | Riesgos y decisiones pendientes por impacto |
 | 13 | [13-estructura-repositorio.md](13-estructura-repositorio.md) | Estructura del monorepo y `CLAUDE.md` inicial |
+| 14 | [14-caso-de-referencia.md](14-caso-de-referencia.md) | Forma del primer hogar (sin datos reales) y requisitos que añade |
 | — | [../adr/](../adr/) | Registros de decisiones de arquitectura (ADR) |
 
 ## Resumen ejecutivo

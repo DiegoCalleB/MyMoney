@@ -238,6 +238,27 @@ Huella de fila: `SHA-256(account_id ‖ occurred_on ‖ amount_minor ‖ currenc
 | `audit.events` | `id bigint identity`, `occurred_at`, `actor_hash bytea`, `space_id`, `action`, `entity`, `entity_id`, `metadata jsonb` (sin PII ni importes), `ip_prefix_hash bytea`, `prev_hash bytea`, `hash bytea`. Ver ADR-0009 |
 | `private.data_requests` | `user_id`, `kind` (`export`, `deletion`), `status`, `requested_at`, `completed_at` |
 
+## Ampliación tras el caso de referencia (ver `14-caso-de-referencia.md`)
+
+El caso del primer usuario mostró seis huecos. Se cubren con piezas **genéricas** (útiles para cualquier usuario), no con parches:
+
+| Tabla / cambio | Columnas principales | Para qué |
+|----------------|----------------------|----------|
+| `account_groups` | `space_id`, `name`, `kind` (`liquidity`, `investment`, `speculative`, `minors`, `custom`), `sort_order` | Categorías del usuario ("Liquidez", "Inversión", "Apuestas", "Hijas") para el desglose y para reglas como el tope especulativo. Sustituye a usar solo `accounts.is_speculative` |
+| `account_group_members` | `group_id`, `account_id` | Una cuenta puede estar en varios grupos |
+| `transactions.status` | `text` check in (`settled`, `pending`) default `settled` | Traspasos entre gestoras u órdenes en curso: aparecen en el historial pero se marcan; los cálculos indican si las incluyen |
+| `investment_plans` | `space_id`, `name`, `source_account_id`, `total_minor`, `currency`, `start_on`, `end_on`, `status` | Plan de entrada escalonada: importe total que invertir en un periodo |
+| `planned_operations` | `plan_id` (null si es suelta), `space_id`, `planned_on date`, `amount_minor`, `currency`, `target_account_id`, `allocation jsonb` (activo o clase de activo → pb), `status` (`planned`, `done`, `skipped`), `transaction_id` null | Calendario: marcar como hecha enlaza la transacción real; el resto del plan se recalcula (importe pendiente / operaciones restantes) |
+| `scenarios` | `space_id`, `name`, `description`, `base_date`, `created_by` | Hipótesis ("¿y si compro un 3 % de oro?", "¿y si traspaso a la cartera X?") que **nunca** cuentan como reales |
+| `scenario_operations` | `scenario_id`, mismas columnas que una transacción con sus patas, en JSON validado con Zod | Operaciones simuladas; el motor calcula el patrimonio, la exposición y los costes "con" y "sin" el escenario |
+| `model_portfolios` | `space_id` (null = catálogo genérico), `name`, `composition jsonb` (clase de activo o región → pb), `ter_bps`, `assumptions jsonb` (rentabilidad y volatilidad supuestas, peor caída histórica **con su fuente y periodo**) | Comparar carteras genéricas por composición y coste. **No** es un catálogo de productos recomendados: el usuario introduce las que valora |
+| `asset_compositions` | `asset_id`, `as_of`, `dimension` (`asset_class`, `region`, `currency`, `sector`, `holding`), `key`, `weight_bps`, `source` | Composición real de cada fondo (*look-through*) para la diversificación y los solapamientos. Si no hay datos, la UI lo dice en lugar de suponer |
+| `goals.reserved_minor` + regla | Importe reservado del objetivo que no debe estar en renta variable según su plazo | "El colchón no se invierte"; "el dinero de la casa a 5 años no va a bolsa": se excluye del efectivo invertible y se avisa si una operación planificada lo invade |
+
+Reglas de avisos nuevas (nivel 2, sin productos): `goal_reserve_invaded`, `planned_operation_overdue`, `pension_contribution_limit` (parámetro por ejercicio), `pension_withdrawal_tax_info`, `crypto_swap_taxable_info`, `fund_overlap` (requiere composición), `stress_exceeds_tolerance` (usa la pérdida máxima declarada en el perfil).
+
+Matriz RLS: todas siguen el patrón estándar (lectura para cualquier rol vigente; escritura para propietario y editor), salvo `model_portfolios` y `asset_compositions` globales (`space_id` null o activo global), que son de solo lectura para `authenticated`.
+
 ## Índices
 
 | Tabla | Índice | Motivo |

@@ -13,3 +13,8 @@ next-env.d.ts
 supabase/.temp/
 supabase/.branches/
 .DS_Store
+
+# Datos personales reales: NUNCA al repositorio
+privado/
+*.real.md
+*.real.csv
