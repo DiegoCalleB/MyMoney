@@ -49,6 +49,8 @@ export const esES = {
   "auth.sign_up.submit": "Crear cuenta",
   "auth.sign_up.have_account": "¿Ya tienes cuenta?",
   "auth.sign_up_failed": "No hemos podido crear la cuenta. Inténtalo de nuevo más tarde.",
+  "auth.unavailable":
+    "El servicio no está disponible ahora mismo. Inténtalo de nuevo en unos minutos.",
   "auth.sign_up_closed": "El registro no está disponible ahora mismo.",
   "auth.check_email.title": "Revisa tu correo",
   "auth.check_email.body":

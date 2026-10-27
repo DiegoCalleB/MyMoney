@@ -7,6 +7,30 @@ import { readAppOrigin } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { createSupabaseServerClient } from "@/server/supabase";
 
+/**
+ * Cliente de Supabase o `null` si la configuración falta o es inválida. Así un fallo de
+ * configuración se ve como "servicio no disponible" y deja una pista en los registros, en
+ * lugar de una página de error genérica.
+ */
+async function clientOrNull() {
+  try {
+    return await createSupabaseServerClient();
+  } catch {
+    logger.error("auth.client_unavailable", { code: "supabase_config" });
+    return null;
+  }
+}
+
+/** Origen público para los enlaces de correo, o `null` si `APP_ORIGIN` no es válido. */
+function originOrNull(): string | null {
+  try {
+    return readAppOrigin();
+  } catch {
+    logger.error("auth.origin_invalid", { code: "app_origin" });
+    return null;
+  }
+}
+
 export async function signUpAction(_previous: FormState, formData: FormData): Promise<FormState> {
   const parsed = signUpInput.safeParse({
     email: formText(formData, "email"),
@@ -14,11 +38,13 @@ export async function signUpAction(_previous: FormState, formData: FormData): Pr
   });
   if (!parsed.success) return fieldErrorsFrom(parsed.error);
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = await clientOrNull();
+  const origin = originOrNull();
+  if (!supabase || !origin) return { error: "auth.unavailable" };
   const { error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
-    options: { emailRedirectTo: `${readAppOrigin()}/auth/callback` },
+    options: { emailRedirectTo: `${origin}/auth/callback` },
   });
   if (error) {
     logger.warn("auth.sign_up_failed", {
@@ -40,7 +66,8 @@ export async function signInAction(_previous: FormState, formData: FormData): Pr
   });
   if (!parsed.success) return { error: "auth.invalid_credentials" };
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = await clientOrNull();
+  if (!supabase) return { error: "auth.unavailable" };
   const { error } = await supabase.auth.signInWithPassword(parsed.data);
   if (error) {
     logger.warn("auth.sign_in_failed", {
