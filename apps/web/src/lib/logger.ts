@@ -4,7 +4,16 @@ import { createHmac } from "node:crypto";
  * Logger con lista blanca de campos (regla 8): nunca importes, nombres, correos, descripciones
  * ni tokens. Los identificadores de usuario y espacio solo salen seudonimizados con HMAC.
  */
-const ALLOWED_FIELDS = ["route", "status", "latencyMs", "requestId", "code", "digest"] as const;
+const ALLOWED_FIELDS = [
+  "route",
+  "status",
+  "latencyMs",
+  "requestId",
+  "code",
+  "digest",
+  /** Códigos cortos de diagnóstico, p. ej. nombres de variables de entorno (nunca valores). */
+  "detail",
+] as const;
 type AllowedField = (typeof ALLOWED_FIELDS)[number];
 type FieldValue = string | number | boolean;
 

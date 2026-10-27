@@ -3,7 +3,7 @@
 import { signInInput, signUpInput } from "@mymoney/schemas";
 import { redirect } from "next/navigation";
 import { fieldErrorsFrom, formText, type FormState } from "@/components/form-state";
-import { readAppOrigin } from "@/lib/env";
+import { describePublicEnv, readAppOrigin } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { createSupabaseServerClient } from "@/server/supabase";
 
@@ -16,9 +16,17 @@ async function clientOrNull() {
   try {
     return await createSupabaseServerClient();
   } catch {
-    logger.error("auth.client_unavailable", { code: "supabase_config" });
+    logger.error("auth.client_unavailable", {
+      code: "supabase_config",
+      detail: describePublicEnv().join(",") || "unknown",
+    });
     return null;
   }
+}
+
+/** Texto para la persona: distingue la configuración de Supabase de otros fallos. */
+function unavailableMessage(): string {
+  return describePublicEnv().length > 0 ? "auth.unavailable_config" : "auth.unavailable";
 }
 
 /** Origen público para los enlaces de correo, o `null` si `APP_ORIGIN` no es válido. */
@@ -26,7 +34,7 @@ function originOrNull(): string | null {
   try {
     return readAppOrigin();
   } catch {
-    logger.error("auth.origin_invalid", { code: "app_origin" });
+    logger.error("auth.origin_invalid", { code: "app_origin", detail: "APP_ORIGIN" });
     return null;
   }
 }
@@ -40,7 +48,8 @@ export async function signUpAction(_previous: FormState, formData: FormData): Pr
 
   const supabase = await clientOrNull();
   const origin = originOrNull();
-  if (!supabase || !origin) return { error: "auth.unavailable" };
+  if (!supabase) return { error: unavailableMessage() };
+  if (!origin) return { error: "auth.unavailable_origin" };
   const { error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
@@ -67,7 +76,7 @@ export async function signInAction(_previous: FormState, formData: FormData): Pr
   if (!parsed.success) return { error: "auth.invalid_credentials" };
 
   const supabase = await clientOrNull();
-  if (!supabase) return { error: "auth.unavailable" };
+  if (!supabase) return { error: unavailableMessage() };
   const { error } = await supabase.auth.signInWithPassword(parsed.data);
   if (error) {
     logger.warn("auth.sign_in_failed", {

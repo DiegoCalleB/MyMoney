@@ -18,24 +18,48 @@ export type PublicEnv = z.infer<typeof publicEnv>;
 export function readPublicEnv(
   source: Record<string, string | undefined> = process.env,
 ): PublicEnv | null {
+  // Se recortan los espacios: al pegar valores en un panel es el error más habitual.
   const parsed = publicEnv.safeParse({
-    url: source.NEXT_PUBLIC_SUPABASE_URL,
-    publishableKey: source.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+    url: source.NEXT_PUBLIC_SUPABASE_URL?.trim(),
+    publishableKey: source.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim(),
   });
   if (parsed.success) return parsed.data;
-  if (source.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.startsWith("sb_secret_")) {
+  if (source.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim().startsWith("sb_secret_")) {
     throw new Error("Configuración insegura: clave secreta de Supabase en la web");
   }
   return null;
 }
 
 /**
+ * Qué variables públicas de Supabase fallan y por qué, solo con sus nombres (nunca valores):
+ * sirve para diagnosticar una configuración errónea sin filtrar nada.
+ */
+export function describePublicEnv(
+  source: Record<string, string | undefined> = process.env,
+): string[] {
+  const problems: string[] = [];
+  const url = source.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  if (!url) problems.push("NEXT_PUBLIC_SUPABASE_URL:missing");
+  else if (!z.url().safeParse(url).success) problems.push("NEXT_PUBLIC_SUPABASE_URL:invalid");
+  const key = source.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim();
+  if (!key) problems.push("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:missing");
+  else if (key.startsWith("sb_secret_"))
+    problems.push("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:secret");
+  else if (key.length < 20) problems.push("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:invalid");
+  return problems;
+}
+
+/**
  * Origen público de la web, para los enlaces de los correos de confirmación. Debe ser una
- * dirección absoluta sin ruta; si falta, se usa la local de desarrollo.
+ * dirección absoluta sin ruta. Si falta, solo en desarrollo se usa la local.
  */
 export function readAppOrigin(source: Record<string, string | undefined> = process.env): string {
-  const raw = source.APP_ORIGIN;
-  if (!raw) return "http://localhost:3000";
+  const raw = source.APP_ORIGIN?.trim();
+  if (!raw) {
+    // En producción, un origen por defecto enviaría los enlaces del correo a localhost.
+    if (source.NODE_ENV === "production") throw new Error("Falta APP_ORIGIN");
+    return "http://localhost:3000";
+  }
   const url = new URL(raw);
   if (url.pathname !== "/" || url.search || url.hash || !/^https?:$/.test(url.protocol)) {
     throw new Error("APP_ORIGIN debe ser un origen http(s) sin ruta");

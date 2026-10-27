@@ -42,3 +42,71 @@ describe("readAppOrigin", () => {
     expect(() => readAppOrigin({ APP_ORIGIN: "ftp://x.example.com" })).toThrow();
   });
 });
+
+import { describePublicEnv } from "@/lib/env";
+
+describe("describePublicEnv", () => {
+  it("no señala nada si la configuración es válida", () => {
+    expect(
+      describePublicEnv({
+        NEXT_PUBLIC_SUPABASE_URL: "https://x.supabase.co",
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_0123456789abcdef",
+      }),
+    ).toEqual([]);
+  });
+
+  it("nombra la variable que falla y por qué, sin valores", () => {
+    expect(describePublicEnv({})).toEqual([
+      "NEXT_PUBLIC_SUPABASE_URL:missing",
+      "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:missing",
+    ]);
+    expect(
+      describePublicEnv({
+        NEXT_PUBLIC_SUPABASE_URL: "no es una url",
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "corta",
+      }),
+    ).toEqual(["NEXT_PUBLIC_SUPABASE_URL:invalid", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:invalid"]);
+    expect(
+      describePublicEnv({
+        NEXT_PUBLIC_SUPABASE_URL: "https://x.supabase.co",
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_secret_0123456789abcdef",
+      }),
+    ).toEqual(["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:secret"]);
+  });
+});
+
+describe("readAppOrigin en producción", () => {
+  it("exige APP_ORIGIN: un origen por defecto enviaría los enlaces a localhost", () => {
+    expect(() => readAppOrigin({ NODE_ENV: "production" })).toThrow(/APP_ORIGIN/);
+    expect(readAppOrigin({ NODE_ENV: "production", APP_ORIGIN: "https://a.example.com" })).toBe(
+      "https://a.example.com",
+    );
+  });
+});
+
+describe("espacios al pegar los valores", () => {
+  it("se recortan en la configuración de Supabase y en APP_ORIGIN", () => {
+    expect(
+      readPublicEnv({
+        NEXT_PUBLIC_SUPABASE_URL: "  https://x.supabase.co \n",
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: " sb_publishable_0123456789abcdef ",
+      }),
+    ).toEqual({ url: "https://x.supabase.co", publishableKey: "sb_publishable_0123456789abcdef" });
+    expect(readAppOrigin({ APP_ORIGIN: " https://a.example.com " })).toBe("https://a.example.com");
+    expect(
+      describePublicEnv({
+        NEXT_PUBLIC_SUPABASE_URL: " https://x.supabase.co ",
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: " sb_publishable_0123456789abcdef ",
+      }),
+    ).toEqual([]);
+  });
+
+  it("sigue rechazando la clave secreta aunque venga con espacios", () => {
+    expect(() =>
+      readPublicEnv({
+        NEXT_PUBLIC_SUPABASE_URL: "https://x.supabase.co",
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "  sb_secret_0123456789abcdef",
+      }),
+    ).toThrow(/clave secreta/);
+  });
+});

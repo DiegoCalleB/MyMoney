@@ -51,6 +51,10 @@ export const esES = {
   "auth.sign_up_failed": "No hemos podido crear la cuenta. Inténtalo de nuevo más tarde.",
   "auth.unavailable":
     "El servicio no está disponible ahora mismo. Inténtalo de nuevo en unos minutos.",
+  "auth.unavailable_config":
+    "El servidor no tiene bien configurada la conexión con Supabase (URL o clave publicable).",
+  "auth.unavailable_origin":
+    "La dirección pública de la web (APP_ORIGIN) falta o no es válida en el servidor.",
   "auth.sign_up_closed": "El registro no está disponible ahora mismo.",
   "auth.check_email.title": "Revisa tu correo",
   "auth.check_email.body":

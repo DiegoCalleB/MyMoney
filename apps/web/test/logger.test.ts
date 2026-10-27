@@ -44,6 +44,20 @@ describe("logger", () => {
     ]);
   });
 
+  it("admite el campo detail para códigos de diagnóstico", () => {
+    const { lines, log } = capture();
+    log.error("auth.client_unavailable", {
+      code: "supabase_config",
+      detail: "NEXT_PUBLIC_SUPABASE_URL:missing",
+    });
+    expect(lines[0]).toEqual({
+      level: "error",
+      event: "auth.client_unavailable",
+      code: "supabase_config",
+      detail: "NEXT_PUBLIC_SUPABASE_URL:missing",
+    });
+  });
+
   it("el seudónimo es estable y depende del secreto", () => {
     expect(pseudonymize("a", "s1")).toBe(pseudonymize("a", "s1"));
     expect(pseudonymize("a", "s1")).not.toBe(pseudonymize("a", "s2"));
