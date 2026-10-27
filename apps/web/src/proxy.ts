@@ -63,7 +63,8 @@ export async function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     {
-      source: "/((?!_next/static|_next/image|favicon.ico|robots.txt).*)",
+      // La comprobación de salud queda fuera: no debe consultar a Supabase en cada llamada.
+      source: "/((?!_next/static|_next/image|favicon.ico|robots.txt|api/health).*)",
       missing: [
         { type: "header", key: "next-router-prefetch" },
         { type: "header", key: "purpose", value: "prefetch" },

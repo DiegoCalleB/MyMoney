@@ -20,7 +20,7 @@ Empieza la aplicación web (`apps/web`) sobre el esquema ya aplicado. Hay que de
 6. **Patrimonio** (`finance-core.netWorth`): suma las cuentas del hogar en la moneda base, las deudas restan, una cuenta sin valor o sin tipo de cambio se excluye y el resultado se marca como parcial. Devuelve `{ value, explanation }` y la interfaz lo muestra con «¿De dónde sale esta cifra?».
 7. **Alta rápida de cuenta** guarda la cuenta y su valor de hoy como valoración manual. Son dos escrituras; si falla la segunda se retira la cuenta.
 8. **Importes escritos por personas** (`parseLocalizedAmount`): la coma es el decimal; el punto solo se acepta si es inequívoco; lo ambiguo se rechaza. Nunca se multiplica un importe por 100 en silencio.
-9. **Hosting.** Pendiente de decisión; Railway en una región de la UE es la opción propuesta. Antes de abrir la app a otras personas habrá que firmar el contrato de encargo con el proveedor (ficha 03).
+9. **Hosting.** Railway en la región de Ámsterdam, configurado en el panel (`docs/despliegue.md`); no se usa `railway.json` porque está obsoleto. Antes de abrir la app a otras personas habrá que firmar el contrato de encargo con el proveedor (ficha 03): la web descifra los datos para mostrarlos, así que pasan por su servidor.
 
 ## Alternativas consideradas
 - **Proyecto `mymoney-dev` aparte** (recomendado por el equipo técnico): aísla producción y permite pruebas automáticas de registro. Rechazado por la persona propietaria mientras solo ella usa la aplicación; se retomará al abrirla a otras personas o cuando se quiera probar el registro de forma automática.

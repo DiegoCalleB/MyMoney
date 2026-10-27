@@ -38,3 +38,11 @@ test("una ruta protegida sin sesión no muestra datos", async ({ page }) => {
   expect(page.url()).not.toContain("/s/");
   expect(response?.status()).toBeLessThan(500);
 });
+
+test("la comprobación de salud responde sin cookies ni datos", async ({ request }) => {
+  const response = await request.get("/api/health");
+  expect(response.status()).toBe(200);
+  expect(await response.json()).toEqual({ status: "ok" });
+  expect(response.headers()["set-cookie"]).toBeUndefined();
+  expect(response.headers()["cache-control"]).toBe("no-store");
+});
