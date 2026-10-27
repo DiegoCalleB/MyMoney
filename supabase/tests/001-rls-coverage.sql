@@ -1,7 +1,7 @@
 -- Metatests de seguridad (docs/plan/15-revision-bd.md). Se ejecutan sobre el catálogo: una tabla,
 -- función o vista nueva que incumpla las reglas rompe el CI aunque nadie escriba un test para ella.
 begin;
-select plan(11);
+select plan(12);
 
 select is(
   (select coalesce(array_agg(c.relnamespace::regnamespace || '.' || c.relname order by c.relname), '{}')
@@ -111,6 +111,16 @@ select is(
           !~ 'SELECT (private\.[a-z_]+_space_ids\(\)|auth\.uid\(\)|private\.meets_sensitive_aal\(\))'),
   '{}'::text[],
   'las políticas envuelven las funciones en (select ...) para no evaluarlas por fila'
+);
+
+-- La procedencia (quién introdujo un dato) no es editable por los usuarios en ninguna tabla.
+select is(
+  (select coalesce(array_agg(c.table_name || '.' || c.column_name order by 1), '{}')
+     from information_schema.columns c
+    where c.table_schema = 'public' and c.column_name = 'entered_by'
+      and has_column_privilege('authenticated', format('public.%I', c.table_name), c.column_name, 'UPDATE')),
+  '{}'::text[],
+  'entered_by no es actualizable por usuarios'
 );
 
 select * from finish();

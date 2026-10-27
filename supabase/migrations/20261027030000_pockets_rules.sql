@@ -371,6 +371,9 @@ begin
   perform private.secure_space_table('advice_rule_revisions', p_crud => false);
 end $$;
 
+-- La procedencia la fija el trigger con el usuario autenticado; además, nadie puede ni intentar editarla.
+revoke update (entered_by) on public.asset_fact_sheets, public.cash_rate_tiers from authenticated;
+
 create policy advice_rules_insert on public.advice_rules for insert to authenticated
 with check (space_id = any ((select private.writable_space_ids())::uuid[]));
 create policy advice_rules_update on public.advice_rules for update to authenticated
