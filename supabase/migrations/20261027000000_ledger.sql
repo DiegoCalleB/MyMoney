@@ -381,6 +381,30 @@ create view public.tax_parameters with (security_invoker = true) as
 revoke all on public.tax_parameters from public, anon, authenticated;
 grant select on public.tax_parameters to authenticated;
 
+-- Precios de mercado por instrumento y día (ISIN o símbolo en mayúsculas): datos públicos, sin espacio
+-- ni datos personales, como los tipos de cambio. Se cargan manualmente o con un proveedor con licencia
+-- (fase posterior): la licencia del proveedor, no el esquema, limita su uso y redistribución.
+create table ref.prices (
+  instrument text not null check (instrument ~ '^[A-Z0-9.:_-]{2,30}$'),
+  as_of date not null,
+  price numeric(28, 10) not null check (price > 0),
+  currency char(3) not null references ref.currencies (code),
+  source text not null check (char_length(source) between 1 and 200),
+  primary key (instrument, as_of)
+);
+comment on table ref.prices is 'Precio de un instrumento (ISIN o símbolo) en una fecha, con fuente. Valora posiciones como cantidad × precio cuando no hay valoración manual, y da el historial de precios.';
+create index prices_currency_idx on ref.prices (currency);
+alter table ref.prices enable row level security;
+alter table ref.prices force row level security;
+create policy prices_read on ref.prices for select to authenticated using (true);
+revoke all on ref.prices from public, anon, authenticated;
+grant select on ref.prices to authenticated;
+grant select, insert, update, delete on ref.prices to service_role;
+create view public.prices with (security_invoker = true) as
+  select instrument, as_of, price, currency, source from ref.prices;
+revoke all on public.prices from public, anon, authenticated;
+grant select on public.prices to authenticated;
+
 alter table ref.fx_rates enable row level security;
 alter table ref.fx_rates force row level security;
 alter table ref.inflation_index enable row level security;

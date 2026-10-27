@@ -46,12 +46,12 @@ erDiagram
   accounts ||--o{ transaction_legs : ""
   assets ||--o{ transaction_legs : "opcional"
   accounts ||--o{ valuations : ""
-  assets ||--o{ ref_prices : ""
+  ref_prices }o--o{ assets : "valora por ISIN o símbolo"
   spaces ||--o{ pockets : ""
   pockets ||--o{ pocket_allocations : ""
   accounts ||--o{ pocket_allocations : ""
   spaces ||--o{ assumptions : ""
-  spaces ||--o{ scheduled_contributions : ""
+  spaces ||--o{ recurring_rules : "ingresos, gastos y aportaciones periódicas"
   spaces ||--o{ risk_profiles : ""
   persons ||--o{ risk_profiles : ""
   spaces ||--o{ recommendations : ""
@@ -125,11 +125,11 @@ La aceptación se hace mediante una función RPC `accept_invitation(token)` (`se
 | `kind` | `text` check in (`current`, `savings`, `deposit`, `cash`, `brokerage`, `fund_holding`, `pension_plan`, `crypto`, `real_estate`, `vehicle`, `other_asset`, `mortgage`, `loan`, `credit_card`) | |
 | `is_liability` | `boolean` generado a partir de `kind` | |
 | `currency` | `char(3)` | |
-| `institution_name` | `text` null | Texto libre en el MVP |
+| `institution_id` | `uuid` null | Entidad normalizada (`institutions`) |
 | `iban_last4` | `char(4)` null | Nunca el IBAN completo |
 | `liquidity` | `text` check in (`immediate`, `days`, `months`, `illiquid`) | |
 | `tax_wrapper` | `text` check in (`none`, `fund_transferable`, `pension_plan`, `pias`, `sialp`, `unit_linked`, `other`) | Parametrizable por país |
-| `is_speculative` | `boolean` default false | Para el tope especulativo |
+| `scope` | `text` (`household`, `external`) | `external`: dato ajeno que no entra en el patrimonio del hogar |
 | `opened_on`, `closed_on` | `date` null | |
 | `archived_at` | `timestamptz` null | |
 
@@ -168,7 +168,7 @@ Coste (TER), indicador de riesgo 1-7 y peor caída **no** están en `assets`: vi
 | `occurred_on` | `date` | Fecha valor en la zona del espacio |
 | `description` | `text` ≤ 200 null | Minimizada en la importación |
 | `reverses_id` | `uuid` null FK self | Corrección por inversión |
-| `import_row_id` | `uuid` null | |
+| `source`, `entered_by` | `text`, `uuid` | Origen y quién lo registró; las filas importadas enlazan con `import_rows` |
 
 **`transaction_legs`**
 | Columna | Tipo | Notas |
@@ -183,7 +183,7 @@ Coste (TER), indicador de riesgo 1-7 y peor caída **no** están en `assets`: vi
 | `quantity` | `numeric(38,12)` null | Unidades del activo (positiva = entra) |
 | `amount_minor` | `bigint` | Importe con signo en `currency` |
 | `currency` | `char(3)` | |
-| `fx_rate_to_base` | `numeric(20,10)` null | Tipo efectivamente aplicado si lo hubo |
+| `fx_rate` | `numeric(20,10)` null | Tipo efectivamente aplicado en la pata, si hubo conversión |
 
 **Invariante** (*constraint trigger* diferido al final de la transacción SQL): para cada `transaction_id` y `currency`, `sum(amount_minor) = 0`. Las operaciones con cambio de divisa usan dos patas `external` de conversión (una por moneda) con el tipo aplicado, de forma que cada moneda cuadra por separado.
 
@@ -214,7 +214,7 @@ Ejemplos:
 | `ref.currencies` | `code` | `minor_units smallint` (EUR 2, JPY 0, BTC se trata como activo, no moneda) | ISO 4217 |
 | `ref.fx_rates` | (`base`, `quote`, `as_of`) | `rate numeric(20,10)`, `source` | BCE, tipos de referencia diarios |
 | `ref.inflation_index` | (`country`, `period date` primer día del mes) | `index_value numeric(12,4)`, `series_code`, `published_on` | INE, IPC general |
-| `ref.prices` | (`asset_id`, `as_of`) | `price numeric(28,10)`, `currency`, `source` | Manual en el MVP; proveedor con licencia más adelante |
+| `ref.prices` | (`instrument`, `as_of`) | `price numeric(28,10)`, `currency`, `source` | Precio por ISIN o símbolo; manual en el MVP, proveedor con licencia más adelante. Valora posiciones cuando no hay valoración manual |
 | `ref.tax_parameters` | (`country`, `fiscal_year`, `key`) | `value jsonb`, `source_url`, `verified_on`, `verified_by` | BOE / AEAT; cada valor con fuente |
 | `ref.feature_flags` | (`key`, `scope_type`, `scope_value`) | `enabled`, `variant` | Interno |
 
@@ -233,7 +233,7 @@ Ejemplos:
 | `asset_fact_sheets` | `asset_id`, `as_of`, `ter_bps`, `risk_indicator`, `worst_drawdown_bps` + `worst_drawdown_period`, `source`, `needs_verification` |
 | `tasks` | `kind` (`todo`, `review`, `checklist`), `title`, `due_on`, `status`, `checklist jsonb` (respuestas a la lista cerrada) |
 | `assumptions` | `key` (`expected_return_equity`, `expected_return_bonds`, `expected_inflation`, `emergency_months`, `speculative_cap_bps`, `idle_cash_months`, `fee_alert_ter_bps`, `monthly_expenses_minor`…), `value numeric`, `unit`, `effective_from date`, `note`. Valores por defecto en código, con versión; el usuario los sobrescribe. |
-| `scheduled_contributions` | `account_id`, `asset_id null`, `amount_minor`, `currency`, `rrule text` (subconjunto RFC 5545: FREQ, INTERVAL, BYMONTHDAY), `start_on`, `end_on null`, `active` |
+| `recurring_rules` | `kind` (`income`, `expense`, `contribution`), `amount_minor`, `currency`, `account_id`, `target_account_id` y `asset_id` (aportaciones), `frequency`, `interval_count`, `day_of_month`, `start_on`, `end_on`, `active` | Ingresos, gastos y aportaciones periódicas previstos; no crean movimientos solos |
 | `risk_profiles` | `person_id`, `questionnaire_version`, `answers jsonb`, `horizon_years`, `capacity_score`, `tolerance_score`, `knowledge_score`, `completed_at`, `valid_until` |
 | `recommendations` | `rule_id text`, `rule_version int`, `level smallint` (1-3), `severity` (`info`, `attention`, `important`), `status` (`active`, `dismissed`, `resolved`, `expired`), `inputs_hash bytea`, `inputs_snapshot jsonb` (solo agregados, no movimientos), `assumptions_snapshot jsonb`, `message_key text`, `message_params jsonb`, `confidence` (`high`, `medium`, `low`), `first_shown_at`, `dismissed_reason text null` |
 | `recommendation_events` | `recommendation_id`, `event` (`shown`, `expanded`, `dismissed`, `resolved`, `feedback_useful`, `feedback_not_useful`), `user_id`, `at` |

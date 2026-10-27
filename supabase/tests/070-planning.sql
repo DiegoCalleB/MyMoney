@@ -1,6 +1,6 @@
 -- Planificación: invariantes de sumas, avisos (nivel 3 prohibido), eventos, ISIN, perfil y permisos.
 begin;
-select plan(49);
+select plan(53);
 
 select tests.create_user('alicia@example.test') as alicia \gset
 select tests.create_user('vic@example.test') as vic \gset
@@ -43,6 +43,15 @@ select tests.as_postgres();
 insert into ref.tax_parameters (country, fiscal_year, key, value, source_url, verified_on) values ('ES', 2026, 'pension.contribution_limit_minor', '"150000"', 'https://www.boe.es/', '2026-10-27');
 select tests.authenticate_as(:'alicia');
 select is((select count(*)::int from public.tax_parameters where country = 'ES'), 1, 'un usuario lee los parámetros fiscales con su fuente');
+select tests.as_postgres();
+insert into ref.prices (instrument, as_of, price, currency, source) values ('IE00B4L5Y983', '2026-10-26', 98.1234567890, 'EUR', 'Carga manual');
+select tests.authenticate_as(:'alicia');
+select is((select count(*)::int from public.prices where instrument = 'IE00B4L5Y983'), 1, 'un usuario lee los precios de mercado con su fuente');
+select throws_ok($$insert into public.prices values ('X', '2026-01-01', 1, 'EUR', 'f')$$, '42501', null, 'pero no los modifica');
+select tests.as_postgres();
+select throws_ok($$insert into ref.prices (instrument, as_of, price, currency, source) values ('IE00B4L5Y983', '2026-10-27', 0, 'EUR', 'f')$$, '23514', null, 'un precio es positivo');
+select throws_ok($$insert into ref.prices (instrument, as_of, price, currency, source) values ('ie00', '2026-10-27', 1, 'EUR', 'f')$$, '23514', null, 'el instrumento es un ISIN o símbolo en mayúsculas');
+select tests.authenticate_as(:'alicia');
 select throws_ok($$insert into public.tax_parameters (country, fiscal_year, key, value, source_url, verified_on) values ('ES', 2026, 'x', '1', 'https://x', '2026-01-01')$$,
   '42501', null, 'pero no los modifica');
 

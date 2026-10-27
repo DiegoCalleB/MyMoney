@@ -50,10 +50,12 @@ create table public.recurring_rules (
   id uuid primary key default gen_random_uuid(),
   space_id uuid not null references public.spaces (id) on delete cascade,
   name text not null check (char_length(name) between 1 and 80),
-  kind text not null check (kind in ('income', 'expense')),
+  kind text not null check (kind in ('income', 'expense', 'contribution')),
   amount_minor bigint not null check (amount_minor between 1 and 1000000000000000),
   currency char(3) not null references ref.currencies (code),
   account_id uuid,
+  target_account_id uuid,
+  asset_id uuid,
   category_id uuid,
   frequency text not null check (frequency in ('weekly', 'monthly', 'quarterly', 'yearly')),
   interval_count smallint not null default 1 check (interval_count between 1 and 52),
@@ -66,15 +68,26 @@ create table public.recurring_rules (
   updated_at timestamptz not null default now(),
   unique (id, space_id),
   foreign key (account_id, space_id) references public.accounts (id, space_id) on delete set null (account_id),
+  foreign key (target_account_id, space_id) references public.accounts (id, space_id) on delete cascade,
+  foreign key (asset_id, space_id) references public.assets (id, space_id) on delete cascade,
   foreign key (category_id, space_id) references public.categories (id, space_id) on delete set null (category_id),
-  check (end_on is null or end_on >= start_on)
+  check (end_on is null or end_on >= start_on),
+  -- Una aportación periódica mueve dinero a una cuenta propia (y, si procede, a un producto); no lleva categoría.
+  check ((kind = 'contribution') = (target_account_id is not null)),
+  check (kind = 'contribution' or asset_id is null),
+  check (kind <> 'contribution' or category_id is null),
+  check (account_id is null or target_account_id is null or account_id <> target_account_id)
 );
 comment on column public.recurring_rules.name is 'Nombre libre (p. ej., el pagador o el comercio). [pii]';
 comment on column public.recurring_rules.note is 'Anotación libre del usuario. [pii]';
-comment on table public.recurring_rules is 'Ingresos y gastos previstos (nómina, alquiler, suscripciones) para previsión de caja y recordatorios. No crean movimientos por sí solas: el usuario los confirma. [financiero]';
+comment on column public.recurring_rules.target_account_id is 'Solo en aportaciones periódicas: cuenta propia que recibe el dinero (account_id, si existe, es la que lo envía).';
+comment on column public.recurring_rules.asset_id is 'Solo en aportaciones periódicas: producto al que se destina, si se conoce.';
+comment on table public.recurring_rules is 'Ingresos, gastos y aportaciones periódicas previstos (nómina, alquiler, suscripciones, plan de pensiones mensual) para previsión de caja, "aportado frente a ganado" y recordatorios. No crean movimientos por sí solas: el usuario los confirma. [financiero]';
 create index recurring_rules_space_idx on public.recurring_rules (space_id, active);
 create index recurring_rules_account_idx on public.recurring_rules (space_id, account_id) where account_id is not null;
 create index recurring_rules_category_idx on public.recurring_rules (space_id, category_id) where category_id is not null;
+create index recurring_rules_target_idx on public.recurring_rules (space_id, target_account_id) where target_account_id is not null;
+create index recurring_rules_asset_idx on public.recurring_rules (space_id, asset_id) where asset_id is not null;
 create index recurring_rules_currency_idx on public.recurring_rules (currency);
 
 create table public.categorization_rules (

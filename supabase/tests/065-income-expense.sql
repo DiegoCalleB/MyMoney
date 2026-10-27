@@ -1,7 +1,7 @@
 -- Control de ingresos y gastos: categorías, división de gastos, reembolsos, totales, presupuestos,
 -- recurrentes y reglas. Los traspasos y las inversiones nunca cuentan como ingreso ni gasto.
 begin;
-select plan(40);
+select plan(45);
 
 select tests.create_user('alicia@example.test') as alicia \gset
 select tests.create_user('vic@example.test') as vic \gset
@@ -31,6 +31,7 @@ select id as home from public.categories where space_id = :'sp' and name = 'Hoga
 select id as housing from public.categories where space_id = :'sp' and name = 'Vivienda' \gset
 select id as salary from public.categories where space_id = :'sp' and name = 'Nómina' \gset
 insert into public.accounts (space_id, name, kind, currency) values (:'sp', 'Cuenta corriente', 'current', 'EUR') returning id as bank \gset
+insert into public.accounts (space_id, name, kind, currency) values (:'sp', 'Plan de pensiones', 'pension_plan', 'EUR') returning id as bank2 \gset
 
 -- Gasto dividido en dos categorías
 select lives_ok(format($$select public.create_transaction(%L, 'expense', '2026-01-10', jsonb_build_array(
@@ -127,6 +128,20 @@ select throws_ok(format($$insert into public.recurring_rules (space_id, name, ki
   values (%L, 'Mal', 'expense', 100, 'EUR', 'monthly', '2026-02-01', '2026-01-01')$$, :'sp'), '23514', null, 'un recurrente no termina antes de empezar');
 select throws_ok(format($$insert into public.recurring_rules (space_id, name, kind, amount_minor, currency, frequency, start_on)
   values (%L, 'Cero', 'expense', 0, 'EUR', 'monthly', '2026-01-01')$$, :'sp'), '23514', null, 'el importe de un recurrente es positivo');
+-- Aportaciones periódicas (p. ej., plan de pensiones mensual): mueven dinero a una cuenta propia
+select tests.as_postgres();
+insert into public.accounts (space_id, name, kind, currency) values (:'sp_b', 'Cuenta ajena', 'current', 'EUR') returning id as bank_b \gset
+select tests.authenticate_as(:'alicia');
+select lives_ok(format($$insert into public.recurring_rules (space_id, name, kind, amount_minor, currency, account_id, target_account_id, frequency, day_of_month, start_on)
+  values (%L, 'Aportación mensual', 'contribution', 30000, 'EUR', %L, %L, 'monthly', 1, '2026-01-01')$$, :'sp', :'bank', :'bank2'), 'aportación periódica entre dos cuentas propias');
+select throws_ok(format($$insert into public.recurring_rules (space_id, name, kind, amount_minor, currency, frequency, start_on)
+  values (%L, 'Sin destino', 'contribution', 100, 'EUR', 'monthly', '2026-01-01')$$, :'sp'), '23514', null, 'una aportación exige cuenta de destino');
+select throws_ok(format($$insert into public.recurring_rules (space_id, name, kind, amount_minor, currency, target_account_id, category_id, frequency, start_on)
+  values (%L, 'Con categoría', 'contribution', 100, 'EUR', %L, %L, 'monthly', '2026-01-01')$$, :'sp', :'bank2', :'food'), '23514', null, 'una aportación no lleva categoría (no es gasto)');
+select throws_ok(format($$insert into public.recurring_rules (space_id, name, kind, amount_minor, currency, account_id, target_account_id, frequency, start_on)
+  values (%L, 'A sí misma', 'contribution', 100, 'EUR', %L, %L, 'monthly', '2026-01-01')$$, :'sp', :'bank', :'bank'), '23514', null, 'origen y destino no son la misma cuenta');
+select throws_ok(format($$insert into public.recurring_rules (space_id, name, kind, amount_minor, currency, target_account_id, frequency, start_on)
+  values (%L, 'Ajena', 'contribution', 100, 'EUR', %L, 'monthly', '2026-01-01')$$, :'sp', :'bank_b'), '23503', null, 'ni apunta a cuentas de otro espacio');
 select lives_ok(format($$insert into public.categorization_rules (space_id, pattern, category_id) values (%L, 'MERCADONA', %L)$$, :'sp', :'food'), 'regla "contiene MERCADONA ⇒ alimentación"');
 select throws_ok(format($$insert into public.categorization_rules (space_id, pattern, category_id) values (%L, 'MERCADONA', %L)$$, :'sp', :'food'), '23505', null, 'una regla no se duplica');
 select throws_ok(format($$insert into public.categorization_rules (space_id, pattern, category_id) values (%L, 'X', %L)$$, :'sp', :'cat_b'), '23503', null, 'una regla no apunta a categorías de otro espacio');

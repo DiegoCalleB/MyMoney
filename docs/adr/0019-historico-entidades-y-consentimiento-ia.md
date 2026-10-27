@@ -16,6 +16,8 @@ Segunda revisión antes de la primera migración remota, con los objetivos del p
 6. **Parámetros legales con fuente** (`ref.tax_parameters`): límites y tramos por país y ejercicio, con URL oficial y fecha de verificación; lectura para usuarios, escritura solo del servidor. Ninguna cifra legal en el código.
 7. **Sin piezas fantasma en el plan:** los módulos futuros se activan con *flags* (sin tabla `space_modules`) y la exportación RGPD se descarga al momento (sin almacén de exportaciones).
 
+8. **Aportaciones periódicas y precios** (cierre de dos huecos que el plan ya prometía): `recurring_rules.kind = 'contribution'` con cuenta destino y producto (el plan de pensiones mensual alimenta «aportado frente a ganado»); `ref.prices` (precio por ISIN o símbolo y día, con fuente, de lectura pública y escritura del servidor) para valorar posiciones como cantidad × precio.
+
 ## Qué ya tenía historial (sin cambios)
 Movimientos (fecha contable), valoraciones por cuenta y posición, tipos de cambio por fecha (BCE), IPC mensual por país (INE), fichas y composiciones de producto, tramos de remuneración, supuestos y presupuestos con vigencia, revisiones de reglas.
 
