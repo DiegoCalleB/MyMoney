@@ -17,7 +17,7 @@ Aquí vive el conocimiento de dominio (fiscalidad, regulación, protección de d
 | Ficha | Tema | Alimenta | Estado |
 |---|---|---|---|
 | [01-fiscalidad](01-fiscalidad.md) | IRPF, traspasos, FIFO, pérdidas, patrimonio, modelos 720/721 | `ref.tax_parameters`, cálculos de `finance-core` | borrador sin verificar |
-| 02-regulacion-avisos | Información frente a recomendación y asesoramiento (CNMV, MiFID II) | reglas de avisos, `reco-copy-guard` | pendiente |
+| [02-regulacion-avisos](02-regulacion-avisos.md) | Información frente a recomendación y asesoramiento (CNMV, MiFID II) | reglas de avisos, `reco-copy-guard` | borrador sin verificar |
 | 03-proteccion-datos | RGPD, LOPDGDD, EIPD, decisiones automatizadas | EIPD, consentimientos, retención | pendiente |
 | 04-ia | Reglamento de IA, transparencia de textos generados | explicaciones con IA | pendiente |
 | 05-servicios-pago | PSD2, importar ficheros frente a conectar con bancos | hoja de ruta de importadores | pendiente |
