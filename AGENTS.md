@@ -24,7 +24,7 @@ pnpm agents:check           # falla si las réplicas no están sincronizadas (CI
 
 Con Docker disponible, `supabase test db` es la alternativa de mayor fidelidad para los tests de base de datos.
 
-Opcional: **Graphify** (mapa de conocimiento del repositorio para agentes). Instalación fijada: `uv tool install graphifyy==0.9.90` (paquete con doble *y*; los demás `graphify*` de PyPI no son este proyecto) y `graphify install`; luego `/graphify .`. Respeta `.gitignore` y `.graphifyignore`, que excluyen `privado/`: **nunca** lo ejecutes sobre otra carpeta ni quites esas exclusiones. La salida (`graphify-out/`) no se versiona.
+Opcional: **Graphify** (mapa de conocimiento del repositorio; skill `graphify`). Instalación fijada: `uv tool install "graphifyy[sql]==0.9.90"` (el extra `sql` permite leer las migraciones; paquete con doble *y*; los demás `graphify*` de PyPI no son este proyecto). Con `graphify-out/graph.json` presente, consulta `graphify query "<pregunta>"`, `graphify path "A" "B"` o `graphify explain "X"` antes de buscar en bruto, y tras cambiar código ejecuta `graphify update .` (solo AST, sin LLM). Respeta `.gitignore` y `.graphifyignore`, que excluyen `privado/`: **nunca** lo ejecutes sobre otra carpeta ni quites esas exclusiones, y no configures `GEMINI_API_KEY` para él (enviaría documentos a un tercero). La salida (`graphify-out/`) no se versiona. No uses `graphify install --project`: escribe en `CLAUDE.md` y registra hooks que no queremos.
 
 ## Arquitectura en una línea
 
@@ -88,6 +88,7 @@ Formato abierto *Agent Skills* (`SKILL.md` con `name` y `description`). Fuente: 
 | `importador-entidad` | Soporte para importar extractos de una entidad |
 | `revision-seguridad` | Revisar un cambio antes de fusionarlo |
 | `paso-a-produccion` | Antes de tocar staging o producción |
+| `graphify` | Preguntas sobre la arquitectura o las relaciones entre archivos (mapa de conocimiento) |
 
 Si tu herramienta no carga skills automáticamente, lee el `SKILL.md` correspondiente antes de empezar la tarea.
 
