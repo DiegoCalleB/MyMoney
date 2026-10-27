@@ -45,5 +45,4 @@ Los fondos de inversión y los planes de pensiones **no** son cuentas de pago: q
 
 ## Pruebas derivadas
 
-- Semilla ficticia `supabase/seed/hogar-referencia` con la misma forma y cifras inventadas.
 - Tests E2E: el desglose por bolsillos más lo no asignado suma exactamente el total; el plan escalonado recalcula el resto al marcar una compra; una hipótesis no altera el patrimonio real; el traspaso entre fondos no cambia lo aportado; el aviso de tope especulativo se activa al cruzar el umbral; el aviso de reserva invadida salta si una compra planificada usa dinero reservado.
