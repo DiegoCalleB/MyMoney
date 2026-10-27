@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
+import { DonutChart } from "@/components/donut-chart";
 import { formatMoney } from "@/lib/format";
 import { isMessageKey, t } from "@/lib/i18n";
+import { buildSlices, type SliceInput } from "@/server/chart-model";
 import { requireReadyUser } from "@/server/auth";
 import { loadHome } from "@/server/queries/home";
 import { noticeParams } from "@/server/home-model";
@@ -38,6 +40,7 @@ export default async function HomePage({ params }: { params: Promise<{ spaceId: 
     );
   }
 
+  const charts = buildCharts(data);
   const notices = data.notices.filter((n) => isMessageKey(n.message_key));
   return (
     <main id="contenido" className={styles.main}>
@@ -93,6 +96,25 @@ export default async function HomePage({ params }: { params: Promise<{ spaceId: 
           ) : null}
         </details>
       </section>
+
+      {charts.byKind.length > 0 ? (
+        <section className={styles.section} aria-labelledby="graficos">
+          <h2 id="graficos" className={styles.heading2}>
+            {t("home.charts.title")}
+          </h2>
+          <p className={shell.muted}>{t("home.charts.note")}</p>
+          <h3 className={shell.muted}>{t("home.charts.by_kind")}</h3>
+          <DonutChart slices={charts.byKind} label={t("home.charts.by_kind")} />
+          <h3 className={shell.muted}>{t("home.charts.by_account")}</h3>
+          <DonutChart slices={charts.byAccount} label={t("home.charts.by_account")} />
+          {charts.byPocket.length > 0 ? (
+            <>
+              <h3 className={shell.muted}>{t("home.charts.by_pocket")}</h3>
+              <DonutChart slices={charts.byPocket} label={t("home.charts.by_pocket")} />
+            </>
+          ) : null}
+        </section>
+      ) : null}
 
       {value.byPocket.length > 0 ? (
         <section className={styles.section} aria-labelledby="bolsillos">
@@ -166,4 +188,38 @@ export default async function HomePage({ params }: { params: Promise<{ spaceId: 
       </section>
     </main>
   );
+}
+
+type HomeData = NonNullable<Awaited<ReturnType<typeof loadHome>>>;
+
+/** Composición de lo que se tiene, a partir del mismo cálculo que muestra el patrimonio. */
+function buildCharts(data: HomeData) {
+  const options = { max: 6, otherLabel: t("home.charts.other") };
+  const kinds = new Map<string, SliceInput>();
+  const accounts: SliceInput[] = [];
+  for (const line of data.result.explanation.accounts) {
+    const meta = data.accounts.get(line.accountId);
+    if (!meta) continue;
+    accounts.push({ key: line.accountId, label: meta.name, value: line.contribution });
+    const previous = kinds.get(meta.kind);
+    kinds.set(meta.kind, {
+      key: meta.kind,
+      label: t(`account.kind.${meta.kind}`),
+      value: previous
+        ? { ...previous.value, minor: previous.value.minor + line.contribution.minor }
+        : line.contribution,
+    });
+  }
+  const { byPocket, unassigned } = data.result.value;
+  const pockets: SliceInput[] = byPocket.map((p) => ({
+    key: p.pocketId,
+    label: data.pockets.get(p.pocketId) ?? "",
+    value: p.value,
+  }));
+  pockets.push({ key: "unassigned", label: t("home.unassigned"), value: unassigned });
+  return {
+    byKind: buildSlices([...kinds.values()], options),
+    byAccount: buildSlices(accounts, options),
+    byPocket: byPocket.length > 0 ? buildSlices(pockets, options) : [],
+  };
 }

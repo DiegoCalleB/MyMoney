@@ -101,6 +101,12 @@ export const esES = {
   "home.by_pocket": "Por bolsillo",
   "home.unassigned": "Sin asignar a un bolsillo",
   "home.accounts": "Tus cuentas",
+  "home.charts.title": "Tu cartera en gráficos",
+  "home.charts.by_kind": "Por tipo de activo",
+  "home.charts.by_account": "Por cuenta",
+  "home.charts.by_pocket": "Por bolsillo",
+  "home.charts.other": "Otros",
+  "home.charts.note": "Solo se dibuja lo que tienes; las deudas no forman parte de la composición.",
   "home.add_account": "Añadir cuenta",
   "home.empty.title": "Empieza añadiendo una cuenta",
   "home.empty.body":
