@@ -1,5 +1,5 @@
 -- =============================================================================
--- 2/4 · Cuentas, activos, libro de movimientos y valoraciones.
+-- 2/5 · Cuentas, activos, libro de movimientos y valoraciones.
 -- ADR-0005 (dinero), ADR-0006 (patas), docs/plan/15-revision-bd.md.
 --
 -- Integridad entre espacios: toda FK entre tablas con space_id es COMPUESTA
@@ -83,22 +83,6 @@ create unique index persons_linked_user_idx on public.persons (space_id, linked_
 create index persons_linked_user_fk_idx on public.persons (linked_user_id) where linked_user_id is not null;
 
 -- ---------------------------------------------------------------------------
--- Grupos de cuentas definidos por el usuario (liquidez, inversión, apuestas…)
--- ---------------------------------------------------------------------------
-create table public.account_groups (
-  id uuid primary key default gen_random_uuid(),
-  space_id uuid not null references public.spaces (id) on delete cascade,
-  name text not null check (char_length(name) between 1 and 60),
-  kind text not null default 'custom' check (kind in ('liquidity', 'investment', 'speculative', 'custom')),
-  sort_order integer not null default 0,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  unique (id, space_id),
-  unique (space_id, name)
-);
-comment on table public.account_groups is 'Categorías de cuentas elegidas por el usuario. kind=speculative alimenta el tope de apuestas.';
-
--- ---------------------------------------------------------------------------
 -- Cuentas
 -- ---------------------------------------------------------------------------
 create table public.accounts (
@@ -125,22 +109,11 @@ create table public.accounts (
   check (closed_on is null or opened_on is null or closed_on >= opened_on)
 );
 comment on table public.accounts is 'Cuentas, posiciones agrupadas por entidad, inmuebles y deudas. [financiero]';
+comment on column public.accounts.name is 'Nombre que pone el usuario; puede incluir nombres propios. [pii]';
 comment on column public.accounts.scope is 'household = cuenta del hogar (entra en patrimonio y cálculos); external = dato ajeno que solo se muestra aparte (p. ej., cuentas de menores a nombre de otra persona).';
 comment on column public.accounts.iban_last4 is 'Solo los 4 últimos caracteres, opcional. Nunca el IBAN completo. [pii]';
-create index accounts_space_idx on public.accounts (space_id) where archived_at is null;
+create index accounts_space_idx on public.accounts (space_id);
 create index accounts_currency_idx on public.accounts (currency);
-
-create table public.account_group_members (
-  group_id uuid not null,
-  account_id uuid not null,
-  space_id uuid not null references public.spaces (id) on delete cascade,
-  primary key (group_id, account_id),
-  foreign key (group_id, space_id) references public.account_groups (id, space_id) on delete cascade,
-  foreign key (account_id, space_id) references public.accounts (id, space_id) on delete cascade
-);
-comment on table public.account_group_members is 'Pertenencia de cuentas a grupos (una cuenta puede estar en varios).';
-create index account_group_members_group_idx on public.account_group_members (space_id, group_id);
-create index account_group_members_account_idx on public.account_group_members (space_id, account_id);
 
 create table public.account_holders (
   account_id uuid not null,
@@ -190,17 +163,13 @@ create table public.assets (
   currency char(3) not null references ref.currencies (code),
   asset_class text not null check (asset_class in (
     'equity', 'fixed_income', 'cash', 'real_estate', 'crypto', 'commodity', 'mixed')),
-  equity_weight_bps integer check (equity_weight_bps between 0 and 10000),
-  ter_bps integer check (ter_bps between 0 and 10000),
-  risk_indicator smallint check (risk_indicator between 1 and 7),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  unique (id, space_id),
-  check (equity_weight_bps is null or asset_class = 'mixed')
+  unique (id, space_id)
 );
-comment on table public.assets is 'Activos que el usuario posee o valora (fondos, ETF, acciones, cripto…). El TER lo introduce el usuario.';
-comment on column public.assets.ter_bps is 'Coste anual en puntos básicos (96 = 0,96 %).';
-comment on column public.assets.risk_indicator is 'Indicador de riesgo 1-7 del documento de datos fundamentales, si se conoce.';
+comment on column public.assets.name is 'Nombre del producto; en activos sin catálogo puede ser texto libre. [pii]';
+comment on table public.assets is 'Activos que el usuario posee o compara (fondos, ETF, acciones, cripto, carteras alternativas…). Coste, riesgo y composición viven en fichas con fuente y fecha (asset_fact_sheets, asset_compositions).';
+comment on column public.assets.asset_class is 'Clase principal. Un mixto detalla su reparto real en asset_compositions (dimensión asset_class).';
 create unique index assets_isin_idx on public.assets (space_id, isin) where isin is not null;
 create index assets_space_idx on public.assets (space_id);
 create index assets_currency_idx on public.assets (currency);
@@ -242,6 +211,8 @@ create table public.transactions (
   occurred_on date not null,
   description text check (char_length(description) <= 200),
   status text not null default 'settled' check (status in ('settled', 'pending')),
+  source text not null default 'manual' check (source in ('manual', 'csv', 'statement', 'computed')),
+  entered_by uuid references auth.users (id) on delete set null,
   reverses_id uuid,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -250,10 +221,13 @@ create table public.transactions (
 );
 comment on table public.transactions is 'Cabecera de movimiento. Solo se escribe mediante las RPC create/reverse/delete_transaction. [financiero]';
 comment on column public.transactions.description is 'Texto libre acotado; puede contener datos personales del extracto. Opcional. [pii]';
+comment on column public.transactions.source is 'Origen del movimiento: manual, csv, statement (extracto) o computed. Las filas importadas enlazan además con import_rows.';
+comment on column public.transactions.entered_by is 'Quién lo registró (lo fija la RPC con el usuario autenticado). [pii]';
 comment on column public.transactions.status is 'pending = en curso (p. ej., traspaso entre gestoras); los cálculos indican si lo incluyen.';
 create index transactions_space_date_idx on public.transactions (space_id, occurred_on desc, id);
 create unique index transactions_reverses_idx on public.transactions (space_id, reverses_id) where reverses_id is not null;
 create index transactions_pending_idx on public.transactions (space_id) where status = 'pending';
+create index transactions_entered_by_idx on public.transactions (entered_by) where entered_by is not null;
 
 create table public.transaction_legs (
   id uuid primary key default gen_random_uuid(),
@@ -287,8 +261,9 @@ create table public.transaction_legs (
 comment on table public.transaction_legs is 'Patas de un movimiento: por moneda suman 0. external/fee/tax son flujos que cruzan el borde del espacio. [financiero]';
 comment on column public.transaction_legs.role is 'cash = efectivo de una cuenta; position = posición en un activo; external = dinero que entra o sale del espacio; fee/tax = coste.';
 create index transaction_legs_tx_idx on public.transaction_legs (transaction_id, space_id);
+-- Sin predicado: además de los saldos por cuenta, sirve al borrado en cascada de un espacio.
 create index transaction_legs_account_idx on public.transaction_legs (space_id, account_id)
-  include (transaction_id, role, amount_minor, currency) where account_id is not null;
+  include (transaction_id, role, amount_minor, currency);
 create index transaction_legs_asset_idx on public.transaction_legs (space_id, asset_id)
   where asset_id is not null;
 create index transaction_legs_charged_idx on public.transaction_legs (space_id, charged_account_id)
@@ -313,6 +288,7 @@ create table public.valuations (
   foreign key (asset_id, space_id) references public.assets (id, space_id) on delete cascade,
   unique nulls not distinct (account_id, asset_id, as_of)
 );
+comment on column public.valuations.note is 'Anotación libre del usuario. [pii]';
 comment on table public.valuations is 'Valor de una cuenta (asset_id nulo) o posición en una fecha. Importes positivos: en deudas, el saldo pendiente. [financiero]';
 create index valuations_account_idx on public.valuations (space_id, account_id, as_of desc);
 create index valuations_asset_idx on public.valuations (space_id, asset_id) where asset_id is not null;
@@ -460,8 +436,8 @@ create function private.guard_transaction_update() returns trigger
 language plpgsql set search_path = ''
 as $$
 begin
-  if (new.space_id, new.kind, new.reverses_id, new.created_at) is distinct from
-     (old.space_id, old.kind, old.reverses_id, old.created_at) then
+  if (new.space_id, new.kind, new.reverses_id, new.source, new.entered_by, new.created_at) is distinct from
+     (old.space_id, old.kind, old.reverses_id, old.source, old.entered_by, old.created_at) then
     raise exception 'Columnas inmutables de la transacción' using errcode = 'insufficient_privilege';
   end if;
   if old.status = 'settled' and new.status = 'pending' then
@@ -569,9 +545,7 @@ create trigger accounts_audit after insert or delete on public.accounts
 do $$
 begin
   perform private.secure_space_table('persons');
-  perform private.secure_space_table('account_groups');
   perform private.secure_space_table('accounts');
-  perform private.secure_space_table('account_group_members');
   perform private.secure_space_table('account_holders');
   perform private.secure_space_table('loan_terms');
   perform private.secure_space_table('assets');
@@ -594,7 +568,7 @@ grant update (description, status, occurred_on) on public.transactions to authen
 -- ---------------------------------------------------------------------------
 create function public.create_transaction(
   p_space_id uuid, p_kind text, p_occurred_on date, p_legs jsonb,
-  p_description text default null, p_status text default 'settled'
+  p_description text default null, p_status text default 'settled', p_source text default 'manual'
 ) returns uuid
 language plpgsql security definer set search_path = ''
 as $$
@@ -612,8 +586,8 @@ begin
   if v_n < 2 or v_n > 100 then
     raise exception 'Una transacción lleva entre 2 y 100 patas' using errcode = 'invalid_parameter_value';
   end if;
-  insert into public.transactions (space_id, kind, occurred_on, description, status)
-  values (p_space_id, p_kind, p_occurred_on, p_description, p_status)
+  insert into public.transactions (space_id, kind, occurred_on, description, status, source, entered_by)
+  values (p_space_id, p_kind, p_occurred_on, p_description, p_status, p_source, (select auth.uid()))
   returning id into v_tx;
   -- space_id sale siempre del parámetro verificado: el JSON no puede elegir espacio.
   insert into public.transaction_legs
@@ -648,8 +622,8 @@ begin
   v_on := coalesce(p_occurred_on,
     (now() at time zone (select s.timezone from public.spaces s where s.id = v_t.space_id))::date);
   begin
-    insert into public.transactions (space_id, kind, occurred_on, description, status, reverses_id)
-    values (v_t.space_id, v_t.kind, v_on, coalesce(p_description, 'Reversión'), 'settled', v_t.id)
+    insert into public.transactions (space_id, kind, occurred_on, description, status, source, entered_by, reverses_id)
+    values (v_t.space_id, v_t.kind, v_on, coalesce(p_description, 'Reversión'), 'settled', 'manual', (select auth.uid()), v_t.id)
     returning id into v_new;
   exception when unique_violation then
     raise exception 'El movimiento ya fue revertido' using errcode = 'check_violation';

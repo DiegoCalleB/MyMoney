@@ -40,12 +40,20 @@ Fecha: 2026-10-26. Alcance: las 4 migraciones de `supabase/migrations/` (43 tabl
 7. **Avisos:** nivel limitado a 1-2 en la tabla y en la RPC (doble barrera con las flags).
 8. **Sin `pg_cron`:** el mantenimiento (`private.purge_expired`, `audit.purge_older_than`, `audit.verify_all`) son funciones listas para programar con una función programada de Supabase o activando `pg_cron`.
 
+## 3 bis. Revisión final antes de la primera migración remota (27-10-2026, ADR-0018)
+
+- **Simplificación:** de 42 a 34 tablas en `public`. Bolsillos en lugar de objetivos y grupos de cuentas; hipótesis como planes `what_if`; alternativas como activos con ficha; coste, riesgo y peor caída solo en `asset_fact_sheets`.
+- **Huecos cerrados:** reglas por producto, revisiones y listas de comprobación, procedencia de movimientos y de valoraciones de extractos, PDF en importaciones y borrado del original.
+- **Rendimiento:** cinco tablas solo tenían índices parciales por `space_id` (el borrado en cascada no los usa); ahora tienen uno completo. Un índice redundante eliminado.
+- **Seguridad:** sin SQL dinámico en las validaciones de sumas; 17 textos libres etiquetados `[pii]`.
+- **Comprobación:** el esquema que resulta de pegar el archivo único es idéntico (volcado de esquema) al de aplicar las cinco migraciones por separado.
+
 ## 4. Pruebas
 
 | Capa | Qué hay | Resultado |
 |---|---|---|
-| pgTAP | 14 archivos, **252 tests**: metatests de catálogo (RLS forzada, FKs compuestas e indexadas, vistas `security_invoker`, políticas envueltas, funciones sin `search_path` mutable, anon sin permisos), aislamiento **generado para cada tabla** con un fixture obligatorio, roles (propietario, editor, solo lectura, asesor vigente y caducado), invitaciones, auditoría, libro, ingresos y gastos, importaciones, Storage, borrado de cuenta y planes de ejecución | Verde |
-| Mutación | `scripts/db-mutation-check.py`: 17 fallos de seguridad introducidos a propósito (política abierta, RLS sin forzar, FK sin espacio, escritura directa, descuadre permitido, nivel 3 permitido, bucket abierto, MFA omitido, auditoría borrable…) | **17/17 detectados** |
+| pgTAP | 15 archivos, **296 tests**: metatests de catálogo (RLS forzada, FKs compuestas con índice utilizable, sin índices redundantes, vistas `security_invoker`, políticas envueltas, funciones sin `search_path` mutable, anon sin permisos), aislamiento **generado para cada tabla** con un fixture obligatorio, roles (propietario, editor, solo lectura, asesor vigente y caducado), invitaciones, auditoría, libro, ingresos y gastos, importaciones, Storage, borrado de cuenta y planes de ejecución | Verde |
+| Mutación | `scripts/db-mutation-check.py`: 22 fallos introducidos a propósito (política abierta, RLS sin forzar, FK sin espacio, escritura directa, descuadre permitido, nivel 3 permitido, bucket abierto, MFA omitido, auditoría borrable, reparto de bolsillos > 100 %, procedencia falsificable, historial de reglas escribible, hipótesis marcada como hecha, índice parcial como único apoyo de una FK…) | **22/22 detectados** |
 | Dominio | `finance-core`: 37 tests de ejemplos y propiedades | Verde, 100 % de líneas y ramas |
 | Verificación en el entorno real | `supabase/verify/001-security-checks.sql` (solo lectura) | 0 filas esperadas tras aplicar |
 

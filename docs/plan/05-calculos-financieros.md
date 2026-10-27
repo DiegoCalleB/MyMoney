@@ -27,7 +27,7 @@
 | `validateTransaction(tx)` | Cuadre por moneda, roles de las patas coherentes con el tipo, signos |
 | `cashBalance(legs, account, onDate)` | Saldo de efectivo de una cuenta a una fecha |
 | `positions(legs, account, onDate)` | Cantidad por activo y coste acumulado |
-| `externalFlows(legs, scope)` | Flujos externos del ámbito (cuenta, grupo de cuentas o espacio). **Clave**: un traspaso entre cuentas del mismo ámbito no es flujo; entre una cuenta del ámbito y otra fuera del ámbito sí lo es |
+| `externalFlows(legs, scope)` | Flujos externos del ámbito (cuenta, bolsillo o espacio). **Clave**: un traspaso entre cuentas del mismo ámbito no es flujo; entre una cuenta del ámbito y otra fuera del ámbito sí lo es |
 | `marketValue(positions, cash, valuations, prices, fx, onDate)` | Valor de mercado con la fuente y la antigüedad de cada componente |
 | `netWorth(accounts, …, onDate, baseCurrency)` | Activos − deudas con desglose; garantiza que el desglose suma el total |
 
@@ -64,7 +64,7 @@ Ganancia = Valor actual − Σ aportaciones externas + Σ retiradas externas. La
 
 | Función | Descripción |
 |---------|-------------|
-| `exposure(positions, assets)` | Exposición por clase de activo, moneda, entidad, activo y titular. Los fondos mixtos se reparten con `equity_weight_bps` |
+| `exposure(positions, assets)` | Exposición por clase de activo, moneda, entidad, activo y titular. Los fondos mixtos se reparten con su composición por clase de activo (`asset_compositions`); sin ella, se usa la clase principal y se marca la calidad del dato como baja |
 | `concentration(exposure)` | Peso máximo y un índice tipo Herfindahl por dimensión |
 | `stressScenario(exposure, shocks)` | Impacto = Σ exposición_clase × choque_clase; devuelve el impacto por cuenta y total y los meses de gasto equivalentes. Sin correlaciones en el MVP (se dice explícitamente) |
 | `speculativeShare(accounts, assets)` | Peso de lo marcado como especulativo |

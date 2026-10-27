@@ -20,7 +20,7 @@ select tests.authenticate_as(:'alicia');
 insert into public.accounts (space_id, name, kind, currency, liquidity) values (:'sp', 'Banco', 'current', 'EUR', 'immediate') returning id as bank \gset
 insert into public.accounts (space_id, name, kind, currency, tax_wrapper) values (:'sp', 'Bróker', 'brokerage', 'EUR', 'none') returning id as broker \gset
 insert into public.accounts (space_id, name, kind, currency) values (:'sp', 'Cuenta USD', 'current', 'USD') returning id as usd \gset
-insert into public.assets (space_id, kind, name, currency, asset_class, ter_bps) values (:'sp', 'etf', 'ETF de prueba', 'EUR', 'equity', 20) returning id as etf \gset
+insert into public.assets (space_id, kind, name, currency, asset_class) values (:'sp', 'etf', 'ETF de prueba', 'EUR', 'equity') returning id as etf \gset
 
 -- 1. Aportación válida
 select public.create_transaction(:'sp', 'contribution', '2026-01-10',

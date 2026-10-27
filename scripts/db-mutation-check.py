@@ -18,6 +18,7 @@ CORE = "20261026230000_core_multitenancy.sql"
 LEDGER = "20261027000000_ledger.sql"
 PLANNING = "20261027010000_planning.sql"
 IMPORTS = "20261027020000_imports_storage.sql"
+POCKETS = "20261027030000_pockets_rules.sql"
 
 # (nombre, archivo, texto exacto, reemplazo)
 MUTATIONS = [
@@ -70,6 +71,20 @@ MUTATIONS = [
     ("auditoría borrable", CORE,
      "  raise exception 'audit.events es de solo inserción' using errcode = 'insufficient_privilege';",
      "  return old;"),
+    ("reparto de bolsillos por encima del 100 %", POCKETS,
+     "  if v_sum > 10000 then\n    raise exception 'Lo asignado", "  if false then\n    raise exception 'Lo asignado"),
+    ("procedencia elegida por el cliente", POCKETS,
+     "  new.entered_by := coalesce((select auth.uid()), new.entered_by);", "  null;"),
+    ("historial de reglas escribible por usuarios", POCKETS,
+     "grant insert on public.advice_rules to authenticated;",
+     "grant insert on public.advice_rules to authenticated;\n"
+     "grant insert on public.advice_rule_revisions to authenticated;\n"
+     "create policy x on public.advice_rule_revisions for insert to authenticated with check (true);"),
+    ("hipótesis marcada como hecha", PLANNING,
+     "  if new.status = 'done' and exists (", "  if false and exists ("),
+    ("índice parcial como único apoyo de una FK", LEDGER,
+     "create index accounts_space_idx on public.accounts (space_id);",
+     "create index accounts_space_idx on public.accounts (space_id) where archived_at is null;"),
 ]
 
 

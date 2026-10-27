@@ -1,34 +1,9 @@
 -- =============================================================================
--- 3/4 · Objetivos, supuestos, planes de inversión, escenarios, carteras modelo,
+-- 3/5 · Supuestos, ingresos y gastos previstos, pendientes, planes (reales e hipótesis),
 --       composición de fondos, perfil de riesgo y avisos.
 -- docs/plan/04-modelo-datos.md y docs/plan/14-caso-de-referencia.md.
 -- Mismas reglas: FKs compuestas por espacio, RLS forzada, permisos mínimos.
 -- =============================================================================
-
--- ---------------------------------------------------------------------------
--- Objetivos (el dinero asignado a cada uno vive en bolsillos: ver migración de bolsillos y reglas)
--- ---------------------------------------------------------------------------
-create table public.goals (
-  id uuid primary key default gen_random_uuid(),
-  space_id uuid not null references public.spaces (id) on delete cascade,
-  kind text not null check (kind in ('emergency_fund', 'home_purchase', 'retirement', 'education', 'custom')),
-  name text not null check (char_length(name) between 1 and 80),
-  target_minor bigint not null check (target_minor between 0 and 1000000000000000),
-  currency char(3) not null references ref.currencies (code),
-  target_on date,
-  priority smallint not null default 3 check (priority between 1 and 5),
-  person_id uuid,
-  params jsonb not null default '{}'::jsonb check (jsonb_typeof(params) = 'object' and pg_column_size(params) <= 8192),
-  status text not null default 'active' check (status in ('active', 'achieved', 'paused', 'archived')),
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  unique (id, space_id),
-  foreign key (person_id, space_id) references public.persons (id, space_id) on delete set null (person_id)
-);
-comment on table public.goals is 'Objetivos (colchón, vivienda, jubilación, estudios…). params: supuestos del objetivo validados con Zod. [financiero]';
-create index goals_space_idx on public.goals (space_id, status);
-create index goals_person_idx on public.goals (space_id, person_id) where person_id is not null;
-create index goals_currency_idx on public.goals (currency);
 
 -- ---------------------------------------------------------------------------
 -- Supuestos editables (ingresos, gasto, inflación, umbrales…)
@@ -49,6 +24,7 @@ create table public.assumptions (
   check ((unit = 'currency_minor') = (currency is not null)),
   unique nulls not distinct (space_id, key, person_id, effective_from)
 );
+comment on column public.assumptions.note is 'Anotación libre del usuario. [pii]';
 comment on table public.assumptions is 'Supuestos del usuario con vigencia (p. ej., monthly_net_income por persona, expected_inflation, speculative_cap_bps). Valores por defecto en código. [financiero]';
 create index assumptions_lookup_idx on public.assumptions (space_id, key, effective_from desc);
 create index assumptions_person_idx on public.assumptions (space_id, person_id) where person_id is not null;
@@ -93,8 +69,10 @@ create table public.recurring_rules (
   foreign key (category_id, space_id) references public.categories (id, space_id) on delete set null (category_id),
   check (end_on is null or end_on >= start_on)
 );
+comment on column public.recurring_rules.name is 'Nombre libre (p. ej., el pagador o el comercio). [pii]';
+comment on column public.recurring_rules.note is 'Anotación libre del usuario. [pii]';
 comment on table public.recurring_rules is 'Ingresos y gastos previstos (nómina, alquiler, suscripciones) para previsión de caja y recordatorios. No crean movimientos por sí solas: el usuario los confirma. [financiero]';
-create index recurring_rules_space_idx on public.recurring_rules (space_id) where active;
+create index recurring_rules_space_idx on public.recurring_rules (space_id, active);
 create index recurring_rules_account_idx on public.recurring_rules (space_id, account_id) where account_id is not null;
 create index recurring_rules_category_idx on public.recurring_rules (space_id, category_id) where category_id is not null;
 create index recurring_rules_currency_idx on public.recurring_rules (currency);
@@ -122,8 +100,10 @@ create index categorization_rules_category_idx on public.categorization_rules (s
 create table public.tasks (
   id uuid primary key default gen_random_uuid(),
   space_id uuid not null references public.spaces (id) on delete cascade,
+  kind text not null default 'todo' check (kind in ('todo', 'review', 'checklist')),
   title text not null check (char_length(title) between 1 and 120),
   notes text check (char_length(notes) <= 500),
+  checklist jsonb not null default '{}'::jsonb check (jsonb_typeof(checklist) = 'object' and pg_column_size(checklist) <= 4096),
   due_on date,
   status text not null default 'open' check (status in ('open', 'done', 'dismissed')),
   account_id uuid,
@@ -134,20 +114,28 @@ create table public.tasks (
   updated_at timestamptz not null default now(),
   foreign key (account_id, space_id) references public.accounts (id, space_id) on delete set null (account_id),
   foreign key (person_id, space_id) references public.persons (id, space_id) on delete set null (person_id),
-  check (completed_at is null or status = 'done')
+  check (completed_at is null or status = 'done'),
+  check (kind = 'checklist' or checklist = '{}'::jsonb)
 );
+comment on column public.tasks.kind is 'todo = pendiente libre; review = revisión periódica (la regla de "revisión pendiente" mira la última hecha); checklist = comprobaciones antes de contratar o traspasar.';
+comment on column public.tasks.checklist is 'Respuestas a la lista cerrada de comprobaciones (efecto fiscal, comisión de reembolso, solapamientos…), por clave del catálogo; validadas con Zod.';
+comment on column public.tasks.title is 'Texto libre del usuario. [pii]';
+comment on column public.tasks.notes is 'Texto libre del usuario. [pii]';
+comment on column public.tasks.blocked_by is 'Texto libre del usuario. [pii]';
 comment on table public.tasks is 'Pendientes: "mover el dinero de X a otro sitio", "conseguir el DNI de Y"… No son asesoramiento: los escribe el usuario.';
-create index tasks_open_idx on public.tasks (space_id, due_on) where status = 'open';
+create index tasks_space_idx on public.tasks (space_id, status, due_on);
+create index tasks_review_idx on public.tasks (space_id, completed_at desc) where kind = 'review' and status = 'done';
 create index tasks_account_idx on public.tasks (space_id, account_id) where account_id is not null;
 create index tasks_person_idx on public.tasks (space_id, person_id) where person_id is not null;
 
 -- ---------------------------------------------------------------------------
--- Planes de inversión con calendario
+-- Planes: calendario real de compras o hipótesis
 -- ---------------------------------------------------------------------------
 create table public.investment_plans (
   id uuid primary key default gen_random_uuid(),
   space_id uuid not null references public.spaces (id) on delete cascade,
   name text not null check (char_length(name) between 1 and 80),
+  kind text not null default 'schedule' check (kind in ('schedule', 'what_if')),
   source_account_id uuid,
   total_minor bigint not null check (total_minor between 1 and 1000000000000000),
   currency char(3) not null references ref.currencies (code),
@@ -158,9 +146,11 @@ create table public.investment_plans (
   updated_at timestamptz not null default now(),
   unique (id, space_id),
   foreign key (source_account_id, space_id) references public.accounts (id, space_id) on delete set null (source_account_id),
-  check (end_on is null or end_on >= start_on)
+  check (end_on is null or end_on >= start_on),
+  check (kind = 'schedule' or status in ('draft', 'cancelled'))
 );
-comment on table public.investment_plans is 'Plan de entrada escalonada: importe total a invertir en un periodo. Es un plan del usuario, no una recomendación.';
+comment on column public.investment_plans.name is 'Nombre libre del plan. [pii]';
+comment on table public.investment_plans is 'Plan del usuario (no una recomendación). schedule = calendario real de entradas escalonadas; what_if = hipótesis ("¿y si traspaso?", "¿y si añado oro?") que se calcula aparte y nunca altera el patrimonio real.';
 create index investment_plans_space_idx on public.investment_plans (space_id, status);
 create index investment_plans_source_idx on public.investment_plans (space_id, source_account_id) where source_account_id is not null;
 create index investment_plans_currency_idx on public.investment_plans (currency);
@@ -187,8 +177,26 @@ create table public.planned_operations (
   foreign key (transaction_id, space_id) references public.transactions (id, space_id) on delete set null (transaction_id),
   check (transaction_id is null or status = 'done')
 );
+comment on column public.planned_operations.note is 'Anotación libre del usuario. [pii]';
 comment on table public.planned_operations is 'Operación futura. Al marcarla hecha se enlaza la transacción real; el resto del plan se recalcula.';
-create index planned_operations_calendar_idx on public.planned_operations (space_id, planned_on) where status = 'planned';
+
+-- Una operación de una hipótesis nunca se marca hecha ni se enlaza con un movimiento real.
+create function private.guard_planned_operation() returns trigger
+language plpgsql set search_path = ''
+as $$
+begin
+  if new.status = 'done' and exists (
+       select 1 from public.investment_plans p
+       where p.id = new.plan_id and p.space_id = new.space_id and p.kind = 'what_if') then
+    raise exception 'Una operación hipotética no se marca como hecha' using errcode = 'check_violation';
+  end if;
+  return new;
+end;
+$$;
+create trigger planned_operations_guard before insert or update on public.planned_operations
+  for each row execute function private.guard_planned_operation();
+
+create index planned_operations_calendar_idx on public.planned_operations (space_id, planned_on);
 create index planned_operations_plan_idx on public.planned_operations (space_id, plan_id) where plan_id is not null;
 create index planned_operations_source_idx on public.planned_operations (space_id, source_account_id) where source_account_id is not null;
 create index planned_operations_target_idx on public.planned_operations (space_id, target_account_id) where target_account_id is not null;
@@ -206,99 +214,10 @@ create table public.planned_operation_allocations (
   foreign key (asset_id, space_id) references public.assets (id, space_id),
   check (asset_id is not null or label is not null)
 );
+comment on column public.planned_operation_allocations.label is 'Etiqueta libre del reparto. [pii]';
 comment on table public.planned_operation_allocations is 'Reparto de una operación planificada (p. ej., 8000 pb + 2000 pb). Suman 10000 pb por operación. label permite repartir sin haber elegido producto.';
 create index planned_operation_allocations_op_idx on public.planned_operation_allocations (space_id, operation_id);
 create index planned_operation_allocations_asset_idx on public.planned_operation_allocations (space_id, asset_id) where asset_id is not null;
-
--- ---------------------------------------------------------------------------
--- Escenarios hipotéticos: nunca cuentan como datos reales
--- ---------------------------------------------------------------------------
-create table public.scenarios (
-  id uuid primary key default gen_random_uuid(),
-  space_id uuid not null references public.spaces (id) on delete cascade,
-  name text not null check (char_length(name) between 1 and 80),
-  description text check (char_length(description) <= 500),
-  base_date date not null,
-  status text not null default 'open' check (status in ('open', 'archived')),
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  unique (id, space_id)
-);
-comment on table public.scenarios is 'Hipótesis ("¿y si traspaso a otra cartera?", "¿y si añado un 3 % de oro?"). Se calculan aparte del libro real.';
-create index scenarios_space_idx on public.scenarios (space_id, status);
-
-create table public.scenario_operations (
-  id uuid primary key default gen_random_uuid(),
-  scenario_id uuid not null,
-  space_id uuid not null references public.spaces (id) on delete cascade,
-  kind text not null check (kind in (
-    'contribution', 'withdrawal', 'internal_transfer', 'buy', 'sell', 'dividend', 'interest', 'fee', 'tax',
-    'fund_switch', 'loan_payment', 'income', 'expense', 'opening_balance', 'adjustment')),
-  occurred_on date not null,
-  description text check (char_length(description) <= 200),
-  foreign key (scenario_id, space_id) references public.scenarios (id, space_id) on delete cascade,
-  unique (id, space_id)
-);
-create index scenario_operations_scenario_idx on public.scenario_operations (space_id, scenario_id);
-
-create table public.scenario_legs (
-  id uuid primary key default gen_random_uuid(),
-  operation_id uuid not null,
-  space_id uuid not null references public.spaces (id) on delete cascade,
-  role text not null check (role in ('cash', 'position', 'external', 'fee', 'tax')),
-  account_id uuid,
-  asset_id uuid,
-  quantity numeric(38, 12),
-  amount_minor bigint not null check (amount_minor between -1000000000000000 and 1000000000000000),
-  currency char(3) not null references ref.currencies (code),
-  foreign key (operation_id, space_id) references public.scenario_operations (id, space_id) on delete cascade,
-  foreign key (account_id, space_id) references public.accounts (id, space_id) on delete cascade,
-  foreign key (asset_id, space_id) references public.assets (id, space_id) on delete cascade,
-  check (
-    (role = 'cash' and account_id is not null and asset_id is null and quantity is null)
-    or (role = 'position' and account_id is not null and asset_id is not null and quantity is not null)
-    or (role in ('external', 'fee', 'tax') and account_id is null and asset_id is null and quantity is null)
-  )
-);
-comment on table public.scenario_legs is 'Patas de una operación hipotética. El cuadre lo valida finance-core (no es dato contable).';
-create index scenario_legs_op_idx on public.scenario_legs (space_id, operation_id);
-create index scenario_legs_account_idx on public.scenario_legs (space_id, account_id) where account_id is not null;
-create index scenario_legs_asset_idx on public.scenario_legs (space_id, asset_id) where asset_id is not null;
-create index scenario_legs_currency_idx on public.scenario_legs (currency);
-
--- ---------------------------------------------------------------------------
--- Carteras modelo (introducidas por el usuario para comparar; no son recomendaciones)
--- ---------------------------------------------------------------------------
-create table public.model_portfolios (
-  id uuid primary key default gen_random_uuid(),
-  space_id uuid not null references public.spaces (id) on delete cascade,
-  name text not null check (char_length(name) between 1 and 80),
-  description text check (char_length(description) <= 500),
-  ter_bps integer check (ter_bps between 0 and 10000),
-  expected_return_bps integer check (expected_return_bps between -10000 and 10000),
-  volatility_bps integer check (volatility_bps between 0 and 20000),
-  worst_drawdown_bps integer check (worst_drawdown_bps between 0 and 10000),
-  worst_drawdown_source text check (char_length(worst_drawdown_source) between 1 and 200),
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  unique (id, space_id),
-  unique (space_id, name),
-  check (worst_drawdown_bps is null or worst_drawdown_source is not null)
-);
-comment on table public.model_portfolios is 'Cartera genérica para comparar composición, coste y caída histórica. La caída máxima exige su fuente y periodo. Datos del usuario, no catálogo recomendado.';
-create index model_portfolios_space_idx on public.model_portfolios (space_id);
-
-create table public.model_portfolio_weights (
-  portfolio_id uuid not null,
-  space_id uuid not null references public.spaces (id) on delete cascade,
-  dimension text not null check (dimension in ('asset_class', 'region', 'currency')),
-  key text not null check (char_length(key) between 1 and 40),
-  weight_bps integer not null check (weight_bps between 0 and 10000),
-  primary key (portfolio_id, dimension, key),
-  foreign key (portfolio_id, space_id) references public.model_portfolios (id, space_id) on delete cascade
-);
-comment on table public.model_portfolio_weights is 'Composición de una cartera modelo; suma 10000 pb por dimensión.';
-create index model_portfolio_weights_idx on public.model_portfolio_weights (space_id, portfolio_id);
 
 -- ---------------------------------------------------------------------------
 -- Composición real de los fondos (look-through)
@@ -370,6 +289,7 @@ create table public.recommendations (
   unique (id, space_id),
   unique (space_id, rule_id, inputs_hash)
 );
+comment on column public.recommendations.dismissed_reason is 'Motivo libre del usuario. [pii]';
 comment on table public.recommendations is 'Avisos emitidos con su regla, versión, entradas y supuestos (evidencia de qué se mostró). Se crean mediante upsert_recommendation, que valida el nivel con las flags.';
 create index recommendations_active_idx on public.recommendations (space_id, severity) where status = 'active';
 
@@ -387,54 +307,27 @@ create index recommendation_events_rec_idx on public.recommendation_events (spac
 create index recommendation_events_user_idx on public.recommendation_events (user_id) where user_id is not null;
 
 -- ---------------------------------------------------------------------------
--- Invariantes: sumas de pesos y de titularidad
+-- Invariantes: sumas de pesos (security definer: suman todas las filas, no solo las visibles)
 -- ---------------------------------------------------------------------------
-create function private.validate_bps_sum(p_table text, p_where text, p_expected integer, p_exact boolean)
-returns void
-language plpgsql security definer set search_path = ''
-as $$
-declare
-  v_n bigint;
-  v_sum bigint;
-begin
-  execute format('select count(*), coalesce(sum(weight_bps), 0) from public.%I where %s', p_table, p_where)
-    into v_n, v_sum;
-  if v_n > 0 and ((p_exact and v_sum <> p_expected) or (not p_exact and v_sum > p_expected)) then
-    raise exception 'Los pesos de % deben sumar % pb (suman %)', p_table, p_expected, v_sum
-      using errcode = 'check_violation';
-  end if;
-end;
-$$;
-
 create function private.trg_validate_allocations() returns trigger
 language plpgsql security definer set search_path = ''
 as $$
 declare
   v_op uuid := coalesce(new.operation_id, old.operation_id);
+  v_n bigint;
+  v_sum bigint;
 begin
-  perform private.validate_bps_sum('planned_operation_allocations', format('operation_id = %L', v_op), 10000, true);
+  select count(*), coalesce(sum(a.weight_bps), 0) into v_n, v_sum
+  from public.planned_operation_allocations a where a.operation_id = v_op;
+  if v_n > 0 and v_sum <> 10000 then
+    raise exception 'El reparto de la operación debe sumar 10000 pb (suma %)', v_sum using errcode = 'check_violation';
+  end if;
   return null;
 end;
 $$;
 create constraint trigger planned_operation_allocations_validate
   after insert or update or delete on public.planned_operation_allocations
   deferrable initially deferred for each row execute function private.trg_validate_allocations();
-
-create function private.trg_validate_portfolio_weights() returns trigger
-language plpgsql security definer set search_path = ''
-as $$
-declare
-  v_p uuid := coalesce(new.portfolio_id, old.portfolio_id);
-  v_d text := coalesce(new.dimension, old.dimension);
-begin
-  perform private.validate_bps_sum('model_portfolio_weights',
-    format('portfolio_id = %L and dimension = %L', v_p, v_d), 10000, true);
-  return null;
-end;
-$$;
-create constraint trigger model_portfolio_weights_validate
-  after insert or update or delete on public.model_portfolio_weights
-  deferrable initially deferred for each row execute function private.trg_validate_portfolio_weights();
 
 create function private.trg_validate_compositions() returns trigger
 language plpgsql security definer set search_path = ''
@@ -443,9 +336,13 @@ declare
   v_a uuid := coalesce(new.asset_id, old.asset_id);
   v_t date := coalesce(new.as_of, old.as_of);
   v_d text := coalesce(new.dimension, old.dimension);
+  v_sum bigint;
 begin
-  perform private.validate_bps_sum('asset_compositions',
-    format('asset_id = %L and as_of = %L and dimension = %L', v_a, v_t, v_d), 10000, false);
+  select coalesce(sum(c.weight_bps), 0) into v_sum
+  from public.asset_compositions c where c.asset_id = v_a and c.as_of = v_t and c.dimension = v_d;
+  if v_sum > 10000 then
+    raise exception 'La composición supera 10000 pb en %', v_d using errcode = 'check_violation';
+  end if;
   return null;
 end;
 $$;
@@ -458,7 +355,6 @@ create constraint trigger asset_compositions_validate
 -- ---------------------------------------------------------------------------
 do $$
 begin
-  perform private.secure_space_table('goals');
   perform private.secure_space_table('assumptions');
   perform private.secure_space_table('category_budgets');
   perform private.secure_space_table('recurring_rules');
@@ -467,11 +363,6 @@ begin
   perform private.secure_space_table('investment_plans');
   perform private.secure_space_table('planned_operations');
   perform private.secure_space_table('planned_operation_allocations');
-  perform private.secure_space_table('scenarios');
-  perform private.secure_space_table('scenario_operations');
-  perform private.secure_space_table('scenario_legs');
-  perform private.secure_space_table('model_portfolios');
-  perform private.secure_space_table('model_portfolio_weights');
   perform private.secure_space_table('asset_compositions');
   perform private.secure_space_table('risk_profiles');
   -- Avisos: lectura para todos los miembros; el usuario solo actualiza estado y motivo.
@@ -479,6 +370,9 @@ begin
   perform private.secure_space_table('recommendations', p_crud => false);
   perform private.secure_space_table('recommendation_events', p_crud => false);
 end $$;
+
+-- El tipo de un plan es inmutable: una hipótesis no se convierte en calendario real (ni al revés).
+revoke update (kind) on public.investment_plans from authenticated;
 
 create policy recommendations_update on public.recommendations for update to authenticated
 using (space_id = any ((select private.writable_space_ids())::uuid[]))

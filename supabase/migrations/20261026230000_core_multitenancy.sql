@@ -1,5 +1,5 @@
 -- =============================================================================
--- 1/4 · Multitenencia, auditoría, referencia y derechos del usuario.
+-- 1/5 · Multitenencia, auditoría, referencia y derechos del usuario.
 -- ADR-0004 (RLS), ADR-0009 (auditoría), ADR-0011 (flags), docs/plan/15-revision-bd.md.
 --
 -- Principios:
@@ -111,6 +111,7 @@ create table public.spaces (
   updated_at timestamptz not null default now()
 );
 comment on table public.spaces is 'Espacio (hogar, persona o cliente): unidad de aislamiento de datos.';
+comment on column public.spaces.name is 'Nombre libre (p. ej., el apellido de la familia). [pii]';
 create index spaces_created_by_idx on public.spaces (created_by);
 create index spaces_base_currency_idx on public.spaces (base_currency);
 

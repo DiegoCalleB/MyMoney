@@ -1,6 +1,6 @@
 -- ADR-0008: idempotencia de importaciones (archivo y fila) y políticas del bucket privado "imports".
 begin;
-select plan(15);
+select plan(18);
 
 select tests.create_user('alicia@example.test') as alicia \gset
 select tests.create_user('vic@example.test') as vic \gset
@@ -19,17 +19,24 @@ select tests.authenticate_as(:'alicia');
 insert into public.accounts (space_id, name, kind, currency) values (:'sp', 'Cuenta', 'current', 'EUR') returning id as acc \gset
 
 -- Nivel archivo
-insert into public.import_batches (space_id, account_id, file_sha256, storage_path)
-  values (:'sp', :'acc', decode(repeat('aa', 32), 'hex'), :'sp' || '/extracto.csv') returning id as batch \gset
+insert into public.import_batches (space_id, account_id, file_kind, file_sha256, storage_path)
+  values (:'sp', :'acc', 'csv', decode(repeat('aa', 32), 'hex'), :'sp' || '/extracto.csv') returning id as batch \gset
 select throws_ok(
-  format($$insert into public.import_batches (space_id, account_id, file_sha256, storage_path) values (%L, %L, decode(repeat('aa', 32), 'hex'), %L)$$, :'sp', :'acc', :'sp' || '/otro.csv'),
+  format($$insert into public.import_batches (space_id, account_id, file_kind, file_sha256, storage_path) values (%L, %L, 'csv', decode(repeat('aa', 32), 'hex'), %L)$$, :'sp', :'acc', :'sp' || '/otro.csv'),
   '23505', null, 'el mismo archivo no se importa dos veces en la misma cuenta');
 select throws_ok(
-  format($$insert into public.import_batches (space_id, account_id, file_sha256, storage_path) values (%L, %L, decode(repeat('bb', 32), 'hex'), %L)$$, :'sp', :'acc', :'sp_b' || '/robado.csv'),
+  format($$insert into public.import_batches (space_id, account_id, file_kind, file_sha256, storage_path) values (%L, %L, 'csv', decode(repeat('bb', 32), 'hex'), %L)$$, :'sp', :'acc', :'sp_b' || '/robado.csv'),
   '23514', null, 'la ruta del archivo debe colgar de la carpeta de su espacio');
 select throws_ok(
-  format($$insert into public.import_batches (space_id, account_id, file_sha256, storage_path) values (%L, %L, decode('abcd', 'hex'), %L)$$, :'sp', :'acc', :'sp' || '/x.csv'),
+  format($$insert into public.import_batches (space_id, account_id, file_kind, file_sha256, storage_path) values (%L, %L, 'csv', decode('abcd', 'hex'), %L)$$, :'sp', :'acc', :'sp' || '/x.csv'),
   '23514', null, 'el hash de archivo debe ser SHA-256 (32 bytes)');
+select throws_ok(format($$update public.import_batches set original_deleted_at = now() where id = %L$$, :'batch'),
+  '23514', null, 'no se marca el original como borrado mientras conserva su ruta');
+select lives_ok(format($$update public.import_batches set storage_path = null, original_deleted_at = now() where id = %L$$, :'batch'),
+  'tras borrar el original queda la huella (sigue sin poder importarse dos veces)');
+insert into public.valuations (space_id, account_id, as_of, value_minor, currency, source, import_batch_id)
+  values (:'sp', :'acc', '2026-10-25', 100, 'EUR', 'statement', :'batch') returning id as val \gset
+select is((select import_batch_id from public.valuations where id = :'val'), :'batch'::uuid, 'una valoración de un extracto apunta a su importación');
 
 -- Nivel fila
 insert into public.import_rows (batch_id, space_id, account_id, row_index, fingerprint, status)

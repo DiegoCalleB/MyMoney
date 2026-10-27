@@ -5,11 +5,10 @@
 > **Cambios respecto al diseño inicial (decididos al implementar):**
 > - Todas las tablas tienen `space_id not null`: **no hay catálogo global de activos** (evita referencias entre espacios; un catálogo futuro irá en `ref.*`).
 > - **FKs compuestas** `(xxx_id, space_id)` en todas las relaciones entre tablas con `space_id`.
-> - `accounts.is_speculative` se sustituye por **grupos de cuentas** (`account_groups.kind = 'speculative'`); `accounts.scope` distingue cuentas del hogar de datos ajenos (`external`).
-> - El dinero de un objetivo se asigna mediante **bolsillos** (`pockets`, `pocket_allocations`); `goals.reserved_minor` y `goal_accounts` desaparecen (ADR-0017).
-> - Reglas del usuario con historial (`advice_rules`, `advice_rule_revisions`), tramos de remuneración (`cash_rate_tiers`), comisiones con fuente (`asset_fee_snapshots`) y procedencia (`entered_by`, `needs_verification`) (ADR-0017).
+> - **Un concepto por cosa (ADR-0018):** los **bolsillos** (`pockets`, `pocket_allocations`) sustituyen a objetivos (`goals`, `goal_accounts`) y a grupos de cuentas (`account_groups`); las hipótesis son planes `what_if` (sin tablas `scenario_*`); las alternativas con las que comparar son activos con su ficha (sin `model_portfolios`); coste, riesgo y peor caída viven solo en `asset_fact_sheets`. `accounts.scope` distingue cuentas del hogar de datos ajenos (`external`).
+> - Reglas del usuario con historial (`advice_rules`, `advice_rule_revisions`), tramos de remuneración (`cash_rate_tiers`) y procedencia (`source`, `entered_by`, `needs_verification`, `import_batch_id`) (ADR-0017).
 > - Ingresos y gastos: `categories`, `transaction_legs.category_id`, `category_budgets`, `recurring_rules`, `categorization_rules` (ADR-0016).
-> - Escenarios con tablas propias (`scenario_*`); avisos con `level` limitado a 1-2 también en la tabla.
+> - Avisos con `level` limitado a 1-2 también en la tabla.
 > - El libro se escribe **solo por RPC**; `audit.events` se encadena **por espacio**.
 > - Las políticas RLS usan arrays de espacios (`private.readable_space_ids()`…) evaluados una vez por consulta.
 
@@ -47,9 +46,9 @@ erDiagram
   assets ||--o{ transaction_legs : "opcional"
   accounts ||--o{ valuations : ""
   assets ||--o{ ref_prices : ""
-  spaces ||--o{ goals : ""
-  goals ||--o{ goal_accounts : ""
-  accounts ||--o{ goal_accounts : ""
+  spaces ||--o{ pockets : ""
+  pockets ||--o{ pocket_allocations : ""
+  accounts ||--o{ pocket_allocations : ""
   spaces ||--o{ assumptions : ""
   spaces ||--o{ scheduled_contributions : ""
   spaces ||--o{ risk_profiles : ""
@@ -155,10 +154,9 @@ La aceptación se hace mediante una función RPC `accept_invitation(token)` (`se
 | `isin` | `char(12)` null, check de dígito de control (función) | |
 | `ticker`, `mic` | `text` null | |
 | `currency` | `char(3)` | |
-| `asset_class` | `text` (`equity`, `fixed_income`, `cash`, `real_estate`, `crypto`, `commodity`, `mixed`) | Para escenarios de caída |
-| `equity_weight_bps` | `integer` null | Para fondos mixtos |
-| `ter_bps` | `integer` null | Introducido por el usuario o de catálogo con fuente |
-| `risk_indicator` | `smallint` null check 1-7 | Indicador SRI del documento de datos fundamentales, si se conoce |
+| `asset_class` | `text` (`equity`, `fixed_income`, `cash`, `real_estate`, `crypto`, `commodity`, `mixed`) | Clase principal; el reparto real de un mixto va en `asset_compositions` |
+
+Coste (TER), indicador de riesgo 1-7 y peor caída **no** están en `assets`: viven en `asset_fact_sheets` (instantánea con fuente y fecha), para que haya una sola fuente y siempre se sepa de dónde sale el dato.
 
 ### Libro de movimientos (ADR-0006)
 
@@ -224,19 +222,18 @@ Ejemplos:
 
 | Tabla | Columnas principales |
 |-------|----------------------|
-| `goals` | `kind` (`emergency_fund`, `home_purchase`, `retirement`, `education`, `custom`), `name`, `target_minor`, `currency`, `target_on date`, `priority smallint`, `person_id null`, `params jsonb` validado con Zod y con un *check* de `jsonb_typeof` |
-| `pockets` | `kind`, `name`, `target_minor`/`currency`/`target_on` (opcionales), `risk_level`, `horizon_years`, `goal_id null` |
+| `pockets` | `kind` (`emergency`, `home`, `long_term`, `retirement`, `speculative`, `children`, `custom`), `name`, `target_minor`/`currency`/`target_on` (opcionales), `risk_level`, `horizon_years`, `person_id null`, `params jsonb` (supuestos del bolsillo, Zod) |
 | `pocket_allocations` | `pocket_id`, `account_id`, `asset_id null`, `weight_bps` (suma ≤ 10000 por destino; cuenta entera o por posiciones) |
-| `advice_rules` | `template`, `scope`, `metric`, `comparator`, `threshold`, `unit`, `min_duration_days`, `severity`, `status` (activa/pausada con motivo y fecha/archivada), `version` |
+| `advice_rules` | `template`, `scope` (`space`, `pocket`, `account`, `asset`), `metric`, `comparator`, `threshold`, `unit`, `min_duration_days`, `severity`, `status` (activa/pausada con motivo y fecha/archivada), `version` |
 | `advice_rule_revisions` | Historial por trigger (solo lectura) |
 | `cash_rate_tiers` | `account_id`, `effective_from`, `up_to_minor null`, `rate_bps`, `source`, `needs_verification` |
-| `asset_fee_snapshots` | `asset_id`, `as_of`, `ter_bps`, `source` |
+| `asset_fact_sheets` | `asset_id`, `as_of`, `ter_bps`, `risk_indicator`, `worst_drawdown_bps` + `worst_drawdown_period`, `source`, `needs_verification` |
+| `tasks` | `kind` (`todo`, `review`, `checklist`), `title`, `due_on`, `status`, `checklist jsonb` (respuestas a la lista cerrada) |
 | `assumptions` | `key` (`expected_return_equity`, `expected_return_bonds`, `expected_inflation`, `emergency_months`, `speculative_cap_bps`, `idle_cash_months`, `fee_alert_ter_bps`, `monthly_expenses_minor`…), `value numeric`, `unit`, `effective_from date`, `note`. Valores por defecto en código, con versión; el usuario los sobrescribe. |
 | `scheduled_contributions` | `account_id`, `asset_id null`, `amount_minor`, `currency`, `rrule text` (subconjunto RFC 5545: FREQ, INTERVAL, BYMONTHDAY), `start_on`, `end_on null`, `active` |
 | `risk_profiles` | `person_id`, `questionnaire_version`, `answers jsonb`, `horizon_years`, `capacity_score`, `tolerance_score`, `knowledge_score`, `completed_at`, `valid_until` |
 | `recommendations` | `rule_id text`, `rule_version int`, `level smallint` (1-3), `severity` (`info`, `attention`, `important`), `status` (`active`, `dismissed`, `resolved`, `expired`), `inputs_hash bytea`, `inputs_snapshot jsonb` (solo agregados, no movimientos), `assumptions_snapshot jsonb`, `message_key text`, `message_params jsonb`, `confidence` (`high`, `medium`, `low`), `first_shown_at`, `dismissed_reason text null` |
 | `recommendation_events` | `recommendation_id`, `event` (`shown`, `expanded`, `dismissed`, `resolved`, `feedback_useful`, `feedback_not_useful`), `user_id`, `at` |
-| `budgets`, `categories` | Fase 2 |
 
 ### Importación
 
@@ -262,34 +259,29 @@ El caso del primer usuario mostró seis huecos. Se cubren con piezas **genérica
 
 | Tabla / cambio | Columnas principales | Para qué |
 |----------------|----------------------|----------|
-| `account_groups` | `space_id`, `name`, `kind` (`liquidity`, `investment`, `speculative`, `minors`, `custom`), `sort_order` | Categorías del usuario ("Liquidez", "Inversión", "Apuestas", "Hijas") para el desglose y para reglas como el tope especulativo. Sustituye a usar solo `accounts.is_speculative` |
-| `account_group_members` | `group_id`, `account_id` | Una cuenta puede estar en varios grupos |
 | `transactions.status` | `text` check in (`settled`, `pending`) default `settled` | Traspasos entre gestoras u órdenes en curso: aparecen en el historial pero se marcan; los cálculos indican si las incluyen |
-| `investment_plans` | `space_id`, `name`, `source_account_id`, `total_minor`, `currency`, `start_on`, `end_on`, `status` | Plan de entrada escalonada: importe total que invertir en un periodo |
+| `investment_plans` | `space_id`, `name`, `kind` (`schedule`, `what_if`), `source_account_id`, `total_minor`, `currency`, `start_on`, `end_on`, `status` | Calendario real de entradas escalonadas, o hipótesis ("¿y si compro un 3 % de oro?", "¿y si traspaso?") que **nunca** cuentan como reales ni se marcan hechas |
 | `planned_operations` | `plan_id` (null si es suelta), `space_id`, `planned_on date`, `amount_minor`, `currency`, `target_account_id`, `allocation jsonb` (activo o clase de activo → pb), `status` (`planned`, `done`, `skipped`), `transaction_id` null | Calendario: marcar como hecha enlaza la transacción real; el resto del plan se recalcula (importe pendiente / operaciones restantes) |
-| `scenarios` | `space_id`, `name`, `description`, `base_date`, `created_by` | Hipótesis ("¿y si compro un 3 % de oro?", "¿y si traspaso a la cartera X?") que **nunca** cuentan como reales |
-| `scenario_operations` | `scenario_id`, mismas columnas que una transacción con sus patas, en JSON validado con Zod | Operaciones simuladas; el motor calcula el patrimonio, la exposición y los costes "con" y "sin" el escenario |
-| `model_portfolios` | `space_id` (null = catálogo genérico), `name`, `composition jsonb` (clase de activo o región → pb), `ter_bps`, `assumptions jsonb` (rentabilidad y volatilidad supuestas, peor caída histórica **con su fuente y periodo**) | Comparar carteras genéricas por composición y coste. **No** es un catálogo de productos recomendados: el usuario introduce las que valora |
 | `asset_compositions` | `asset_id`, `as_of`, `dimension` (`asset_class`, `region`, `currency`, `sector`, `holding`), `key`, `weight_bps`, `source` | Composición real de cada fondo (*look-through*) para la diversificación y los solapamientos. Si no hay datos, la UI lo dice en lugar de suponer |
-| `goals.reserved_minor` + regla | Importe reservado del objetivo que no debe estar en renta variable según su plazo | "El colchón no se invierte"; "el dinero de la casa a 5 años no va a bolsa": se excluye del efectivo invertible y se avisa si una operación planificada lo invade |
+| Bolsillos + reglas | Parte de cada cuenta asignada a un bolsillo, con su riesgo permitido | "El colchón no se invierte"; "el dinero de la casa a 5 años no va a bolsa": se excluye del efectivo invertible y se avisa si una operación planificada lo invade |
 
 Reglas de avisos nuevas (nivel 2, sin productos): `goal_reserve_invaded`, `planned_operation_overdue`, `pension_contribution_limit` (parámetro por ejercicio), `pension_withdrawal_tax_info`, `crypto_swap_taxable_info`, `fund_overlap` (requiere composición), `stress_exceeds_tolerance` (usa la pérdida máxima declarada en el perfil).
 
-Matriz RLS: todas siguen el patrón estándar (lectura para cualquier rol vigente; escritura para propietario y editor), salvo `model_portfolios` y `asset_compositions` globales (`space_id` null o activo global), que son de solo lectura para `authenticated`.
+Matriz RLS: todas siguen el patrón estándar (lectura para cualquier rol vigente; escritura para propietario y editor). No hay datos globales de negocio: todo lleva `space_id`.
 
 ## Índices
 
 | Tabla | Índice | Motivo |
 |-------|--------|--------|
 | `space_members` | (`user_id`, `space_id`) incluye `role`, `expires_at` | La función de RLS lo consulta en cada fila: debe ser solo índice |
-| `accounts` | (`space_id`) where `archived_at is null` | |
+| `accounts` | (`space_id`) | Sin predicado: también sirve al borrado en cascada de un espacio |
 | `transactions` | (`space_id`, `occurred_on desc`, `id`) | Historial y paginación por cursor |
 | `transaction_legs` | (`account_id`, `transaction_id`); (`space_id`, `asset_id`) where `asset_id is not null`; (`transaction_id`) | Saldos por cuenta, posiciones, cuadre |
 | `valuations` | (`account_id`, `as_of desc`) | Última valoración |
 | `ref.fx_rates` | PK (`base`, `quote`, `as_of`) | Búsqueda "último ≤ fecha" |
 | `recommendations` | (`space_id`, `status`) where `status = 'active'`; único (`space_id`, `rule_id`, `inputs_hash`) | No duplicar avisos |
 | `import_rows` | índice parcial único de la huella | Idempotencia |
-| Todas | `space_id` como primera columna o índice propio | RLS eficiente |
+| Todas | `space_id` como primera columna de un índice sin predicado | RLS eficiente y borrado en cascada; el test 050 lo comprueba en el catálogo, junto con la ausencia de índices redundantes |
 
 Las saldos agregados se calculan al vuelo en el MVP (volumen pequeño). Si un espacio supera ~50.000 patas o el p95 del panel pasa de 500 ms, se añade una vista materializada por cuenta y día, refrescada por *trigger* o tarea programada (decisión medible, no anticipada).
 
@@ -316,7 +308,7 @@ Leyenda: **S** select, **I** insert, **U** update, **D** delete. "—" denegado.
 | `assets` | S I U D | S I U D | S | S | Sin catálogo global |
 | `transactions`, `transaction_legs` | S I U D | S I U D | S | S | Escritura mediante RPC; U/D solo en las primeras 24 h, después por inversión |
 | `valuations` | S I U D | S I U D | S | S | |
-| `goals`, `assumptions`, `scheduled_contributions`, `pockets`, `pocket_allocations`, `cash_rate_tiers`, `asset_fee_snapshots` | S I U D | S I U D | S | S | |
+| `assumptions`, `pockets`, `pocket_allocations`, `cash_rate_tiers`, `asset_fact_sheets`, `asset_compositions`, `investment_plans`, `planned_operations`, `tasks` | S I U D | S I U D | S | S | El tipo de un plan no se cambia |
 | `advice_rules` | S I U (se archiva) | S I U | S | S | Sin borrado |
 | `advice_rule_revisions` | S | S | S | S | Lo escribe un trigger |
 | `risk_profiles` | S I U D | S I U D (de titulares) | S | S | |

@@ -1,5 +1,5 @@
 -- =============================================================================
--- 4/4 · Importación de extractos (ADR-0008) y almacenamiento privado de archivos.
+-- 4/5 · Importación de extractos (ADR-0008) y almacenamiento privado de archivos.
 -- Las importaciones las ven los miembros sin asesores; escriben propietarios y editores.
 -- =============================================================================
 
@@ -14,6 +14,7 @@ create table public.import_mappings (
   unique (id, space_id),
   unique (space_id, name)
 );
+comment on column public.import_mappings.name is 'Nombre libre del mapeo. [pii]';
 comment on table public.import_mappings is 'Mapeo de columnas guardado por entidad (columnas, formato de fecha, separador decimal, signos).';
 
 create table public.import_batches (
@@ -21,8 +22,11 @@ create table public.import_batches (
   space_id uuid not null references public.spaces (id) on delete cascade,
   account_id uuid not null,
   mapping_id uuid,
+  file_kind text not null check (file_kind in ('csv', 'xlsx', 'pdf')),
   file_sha256 bytea not null check (octet_length(file_sha256) = 32),
-  storage_path text not null check (char_length(storage_path) <= 300),
+  storage_path text check (char_length(storage_path) <= 300),
+  keep_original boolean not null default false,
+  original_deleted_at timestamptz,
   row_count integer not null default 0 check (row_count between 0 and 100000),
   status text not null default 'previewed' check (status in ('previewed', 'committed', 'reverted')),
   created_at timestamptz not null default now(),
@@ -33,10 +37,11 @@ create table public.import_batches (
   foreign key (account_id, space_id) references public.accounts (id, space_id),
   foreign key (mapping_id, space_id) references public.import_mappings (id, space_id) on delete set null (mapping_id),
   -- El archivo vive bajo la carpeta de su espacio (la política de Storage lo exige también).
-  check (storage_path like space_id::text || '/%')
+  check (storage_path is null or storage_path like space_id::text || '/%'),
+  check ((original_deleted_at is null) or (storage_path is null))
 );
-comment on table public.import_batches is 'Un archivo importado. El original se borra a los 30 días.';
-create index import_batches_account_idx on public.import_batches (space_id, account_id);
+comment on table public.import_batches is 'Un archivo importado. Solo se extraen fechas, importes, tipo, producto y cantidad (nunca IBAN, dirección ni titular). El original se borra al confirmar la importación salvo que el usuario pida conservarlo (keep_original); la huella file_sha256 se conserva para no importarlo dos veces.';
+comment on column public.import_batches.storage_path is 'Ruta del original en el bucket privado; nula cuando el original ya se borró.';
 create index import_batches_mapping_idx on public.import_batches (space_id, mapping_id) where mapping_id is not null;
 
 create table public.import_rows (
@@ -62,6 +67,12 @@ create unique index import_rows_fingerprint_idx on public.import_rows (space_id,
 create index import_rows_account_idx on public.import_rows (space_id, account_id);
 create index import_rows_tx_idx on public.import_rows (space_id, transaction_id) where transaction_id is not null;
 
+-- Procedencia: una valoración tomada de un extracto apunta a su importación.
+alter table public.valuations add column import_batch_id uuid,
+  add foreign key (import_batch_id, space_id) references public.import_batches (id, space_id) on delete set null (import_batch_id);
+comment on column public.valuations.import_batch_id is 'Importación de la que sale el valor (source csv o statement), para enseñar de dónde viene la cifra.';
+create index valuations_import_batch_idx on public.valuations (space_id, import_batch_id) where import_batch_id is not null;
+
 do $$
 begin
   perform private.secure_space_table('import_mappings', p_read => 'peer');
@@ -75,7 +86,7 @@ end $$;
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
   'imports', 'imports', false, 5242880,
-  array['text/csv', 'text/plain', 'application/vnd.ms-excel',
+  array['text/csv', 'text/plain', 'application/pdf', 'application/vnd.ms-excel',
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'])
 on conflict (id) do update
   set public = false,
@@ -91,6 +102,8 @@ using (bucket_id = 'imports' and (storage.foldername(name))[1] = any ((select pr
 with check (bucket_id = 'imports' and (storage.foldername(name))[1] = any ((select private.writable_space_ids())::text[]));
 create policy imports_delete on storage.objects for delete to authenticated
 using (bucket_id = 'imports' and (storage.foldername(name))[1] = any ((select private.writable_space_ids())::text[]));
+
+grant update (import_batch_id) on public.valuations to authenticated;
 
 -- Permisos de ejecución (las funciones de private se vuelven a conceder tras cada migración).
 revoke execute on all functions in schema private from public, anon, authenticated;

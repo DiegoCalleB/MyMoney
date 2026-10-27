@@ -1,7 +1,7 @@
 -- Integridad entre espacios: una fila de un espacio no puede referenciar datos de otro.
 -- Metatests sobre el catálogo + ataques concretos.
 begin;
-select plan(10);
+select plan(11);
 
 -- Toda FK entre tablas con space_id incluye space_id (clave compuesta).
 select is(
@@ -24,11 +24,31 @@ select is(
       and not exists (
         select 1 from pg_index i
          where i.indrelid = c.conrelid and i.indisvalid
+           -- Un índice parcial solo sirve si su condición es "columna IS NOT NULL" (la implica la búsqueda
+           -- por igualdad de la FK). Con otra condición (p. ej., "solo activas") el borrado en cascada no lo usa.
+           and (i.indpred is null or pg_get_expr(i.indpred, i.indrelid) ~ '^\(\w+ IS NOT NULL\)$')
            and (select array_agg(k order by k)
                   from unnest((string_to_array(i.indkey::text, ' ')::int2[])[1:cardinality(c.conkey)]) k)
              = (select array_agg(k order by k) from unnest(c.conkey) k))),
   '{}'::text[],
-  'toda clave foránea tiene un índice de apoyo'
+  'toda clave foránea tiene un índice de apoyo utilizable'
+);
+
+-- Sin índices redundantes: ninguno es prefijo de otro con la misma condición (solo cuestan escrituras).
+select is(
+  (select coalesce(array_agg(a.indexrelid::regclass::text || ' ⊂ ' || b.indexrelid::regclass::text order by 1), '{}')
+     from pg_index a
+     join pg_index b on b.indrelid = a.indrelid and b.indexrelid <> a.indexrelid
+     join pg_class t on t.oid = a.indrelid
+    where t.relnamespace in ('public'::regnamespace, 'ref'::regnamespace, 'audit'::regnamespace)
+      and not a.indisunique
+      and pg_get_expr(a.indpred, a.indrelid) is not distinct from pg_get_expr(b.indpred, b.indrelid)
+      and (string_to_array(b.indkey::text, ' '))[1:cardinality(string_to_array(a.indkey::text, ' '))]
+          = string_to_array(a.indkey::text, ' ')
+      and string_to_array(a.indclass::text, ' ')
+          = (string_to_array(b.indclass::text, ' '))[1:cardinality(string_to_array(a.indclass::text, ' '))]),
+  '{}'::text[],
+  'no hay índices redundantes'
 );
 
 -- Toda tabla con space_id referencia a spaces con borrado en cascada (borrar un espacio borra todo).
@@ -69,8 +89,8 @@ select throws_ok(
   format($$insert into public.account_holders (account_id, person_id, space_id, share_bps) values (%L, %L, %L, 10000)$$, :'acc_b', :'person_a', :'space_b'),
   '23503', null, 'un titular de otro espacio no puede asignarse a una cuenta ajena');
 select throws_ok(
-  format($$insert into public.goals (space_id, kind, name, target_minor, currency, person_id) values (%L, 'custom', 'x', 1, 'EUR', %L)$$, :'space_b', :'person_a'),
-  '23503', null, 'un objetivo no puede apuntar a una persona de otro espacio');
+  format($$insert into public.pockets (space_id, kind, name, person_id) values (%L, 'children', 'x', %L)$$, :'space_b', :'person_a'),
+  '23503', null, 'un bolsillo no puede apuntar a una persona de otro espacio');
 
 insert into public.pockets (space_id, name) values (:'space_b', 'Bolsillo B') returning id as pk_b \gset
 select throws_ok(

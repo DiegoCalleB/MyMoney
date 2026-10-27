@@ -1,6 +1,6 @@
 -- Planificación: invariantes de sumas, avisos (nivel 3 prohibido), eventos, ISIN, perfil y permisos.
 begin;
-select plan(44);
+select plan(45);
 
 select tests.create_user('alicia@example.test') as alicia \gset
 select tests.create_user('vic@example.test') as vic \gset
@@ -56,8 +56,10 @@ select throws_ok(format($$insert into public.assets (space_id, kind, name, curre
   '23514', null, 'un ISIN con dígito de control erróneo se rechaza al insertar');
 select throws_ok(format($$insert into public.assets (space_id, kind, name, currency, asset_class, isin) values (%L, 'etf', 'Dup', 'EUR', 'equity', 'IE00B4L5Y983')$$, :'sp'),
   '23505', null, 'el ISIN es único por espacio');
-select throws_ok(format($$insert into public.assets (space_id, kind, name, currency, asset_class, equity_weight_bps) values (%L, 'etf', 'X', 'EUR', 'equity', 5000)$$, :'sp'),
-  '23514', null, 'el peso en renta variable solo aplica a activos mixtos');
+select throws_ok(format($$insert into public.asset_fact_sheets (asset_id, space_id, as_of, source) values (%L, %L, '2026-09-30', 'Ficha')$$, :'etf', :'sp'),
+  '23514', null, 'una ficha vacía (sin coste, riesgo ni caída) se rechaza');
+select throws_ok(format($$insert into public.asset_fact_sheets (asset_id, space_id, as_of, worst_drawdown_bps, source) values (%L, %L, '2026-09-30', 3500, 'Ficha')$$, :'etf', :'sp'),
+  '23514', null, 'una caída máxima exige su periodo');
 
 -- Sumas de pesos
 insert into public.investment_plans (space_id, name, total_minor, currency, start_on, status) values (:'sp', 'Plan', 2100000, 'EUR', '2026-10-27', 'active') returning id as plan \gset
@@ -75,17 +77,16 @@ select throws_ok(format($$update public.planned_operations set status = 'done', 
 select throws_ok(format($$insert into public.planned_operation_allocations (operation_id, space_id, weight_bps) values (%L, %L, 10000)$$, :'op', :'sp'),
   '23514', null, 'una asignación necesita activo o etiqueta');
 
-insert into public.model_portfolios (space_id, name, ter_bps) values (:'sp', 'Cartera A', 41) returning id as port \gset
-select lives_ok(format($q$do $b$ begin
-  insert into public.model_portfolio_weights values (%L, %L, 'asset_class', 'equity', 7000), (%L, %L, 'asset_class', 'fixed_income', 3000);
-  set constraints all immediate; end $b$$q$, :'port', :'sp', :'port', :'sp'), 'composición de cartera que suma 10000 pb');
-select throws_ok(format($q$do $b$ begin
-  insert into public.model_portfolio_weights values (%L, %L, 'region', 'world', 6000);
-  set constraints all immediate; end $b$$q$, :'port', :'sp'), '23514', null, 'composición que no suma 10000 pb se rechaza');
-select throws_ok(format($$update public.model_portfolios set worst_drawdown_bps = 3500 where id = %L$$, :'port'),
-  '23514', null, 'una caída máxima exige su fuente');
-select lives_ok(format($$update public.model_portfolios set worst_drawdown_bps = 3500, worst_drawdown_source = 'Simulación histórica 2008-2009, fuente a documentar' where id = %L$$, :'port'),
-  'con fuente se acepta');
+select lives_ok(format($$insert into public.asset_fact_sheets (asset_id, space_id, as_of, ter_bps, risk_indicator, worst_drawdown_bps, worst_drawdown_period, source) values (%L, %L, '2026-09-30', 20, 6, 3400, '2008-2009', 'Ficha del producto')$$, :'etf', :'sp'),
+  'ficha con coste, riesgo y peor caída con su periodo');
+insert into public.investment_plans (space_id, name, kind, total_minor, currency, start_on) values (:'sp', '¿Y si traspaso?', 'what_if', 100000, 'EUR', '2026-11-01') returning id as wif \gset
+insert into public.planned_operations (space_id, plan_id, kind, planned_on, amount_minor, currency) values (:'sp', :'wif', 'fund_switch', '2026-11-01', 100000, 'EUR') returning id as wop \gset
+select throws_ok(format($$update public.planned_operations set status = 'done' where id = %L$$, :'wop'),
+  '23514', null, 'una operación hipotética no se marca como hecha');
+select throws_ok(format($$update public.investment_plans set status = 'active' where id = %L$$, :'wif'),
+  '23514', null, 'una hipótesis no se activa como calendario real');
+select throws_ok(format($$update public.investment_plans set kind = 'schedule' where id = %L$$, :'wif'),
+  '42501', null, 'ni cambia de tipo');
 select lives_ok(format($q$do $b$ begin
   insert into public.asset_compositions values (%L, %L, '2026-09-30', 'holding', 'Posición 1', 400, 'Ficha del fondo'), (%L, %L, '2026-09-30', 'holding', 'Posición 2', 300, 'Ficha del fondo');
   set constraints all immediate; end $b$$q$, :'etf', :'sp', :'etf', :'sp'), 'composición parcial (top posiciones) ≤ 10000 pb');
@@ -93,7 +94,7 @@ select throws_ok(format($q$do $b$ begin
   insert into public.asset_compositions values (%L, %L, '2026-09-30', 'region', 'a', 6000, 'f'), (%L, %L, '2026-09-30', 'region', 'b', 5000, 'f');
   set constraints all immediate; end $b$$q$, :'etf', :'sp', :'etf', :'sp'), '23514', null, 'composición que supera 10000 pb se rechaza');
 
--- Supuestos, objetivos, pendientes y perfil
+-- Supuestos, pendientes y perfil
 select throws_ok(format($$insert into public.assumptions (space_id, key, value, unit, effective_from) values (%L, 'monthly_net_income', 1, 'currency_minor', '2026-01-01')$$, :'sp'),
   '23514', null, 'un supuesto en unidades monetarias exige moneda');
 select lives_ok(format($$insert into public.assumptions (space_id, key, person_id, value, unit, currency, effective_from) values (%L, 'monthly_net_income', %L, 100000, 'currency_minor', 'EUR', '2026-01-01')$$, :'sp', :'p1'),

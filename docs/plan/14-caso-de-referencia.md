@@ -17,9 +17,9 @@
 
 ## Requisitos que este caso añade al diseño (todos genéricos)
 
-1. **Grupos de cuentas** definidos por el usuario (liquidez, inversión, apuestas, menores) para los desgloses y las reglas.
+1. **Bolsillos** definidos por el usuario (colchón, casa, largo plazo, apuestas, hijas) para los desgloses y las reglas (ADR-0017 y ADR-0018; sustituyen a los grupos de cuentas).
 2. **Planes de inversión con calendario**: operaciones planificadas que se marcan como hechas enlazando la transacción real; el resto se recalcula.
-3. **Escenarios hipotéticos** separados de los datos reales (oro, cambio de cartera, traspaso frente a venta).
+3. **Hipótesis** separadas de los datos reales (oro, cambio de cartera, traspaso frente a venta): planes `what_if` que nunca se marcan hechos; las carteras alternativas se dan de alta como activos con su ficha y composición.
 4. **Carteras modelo introducidas por el usuario** para comparar composición, coste y caída histórica con su fuente, sin catálogo de productos recomendados.
 5. **Composición de fondos** (*look-through*) para diversificación y solapamientos, diciendo "sin datos" cuando falten.
 6. **Transacciones en curso** (traspasos entre gestoras).
@@ -46,4 +46,4 @@ Los fondos de inversión y los planes de pensiones **no** son cuentas de pago: q
 ## Pruebas derivadas
 
 - Semilla ficticia `supabase/seed/hogar-referencia` con la misma forma y cifras inventadas.
-- Tests E2E: el desglose por grupos suma exactamente el total; el plan escalonado recalcula el resto al marcar una compra; un escenario no altera el patrimonio real; el traspaso entre fondos no cambia lo aportado; el aviso de tope especulativo se activa al cruzar el umbral; el aviso de reserva invadida salta si una compra planificada usa dinero reservado.
+- Tests E2E: el desglose por bolsillos más lo no asignado suma exactamente el total; el plan escalonado recalcula el resto al marcar una compra; una hipótesis no altera el patrimonio real; el traspaso entre fondos no cambia lo aportado; el aviso de tope especulativo se activa al cruzar el umbral; el aviso de reserva invadida salta si una compra planificada usa dinero reservado.

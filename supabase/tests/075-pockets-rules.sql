@@ -1,6 +1,6 @@
 -- ADR-0017: bolsillos, reparto, reglas con historial, tramos de remuneración y procedencia.
 begin;
-select plan(30);
+select plan(36);
 
 select tests.create_user('alicia@example.test') as alicia \gset
 select tests.create_user('vic@example.test') as vic \gset
@@ -111,11 +111,32 @@ insert into public.valuations (space_id, account_id, as_of, value_minor, currenc
 select is((select entered_by from public.valuations where id = :'val'), :'alicia'::uuid, 'un cliente no puede atribuir un dato a otro usuario');
 select throws_ok(format($$update public.valuations set entered_by = %L where id = %L$$, :'beto', :'val'), '42501', null, 'ni reescribir la procedencia después');
 
+-- Procedencia de los movimientos (el cuadre se valida al final de la transacción, como en producción)
+set constraints all deferred;
+select public.create_transaction(:'sp', 'contribution', '2026-10-25', jsonb_build_array(
+  jsonb_build_object('role', 'external', 'amount_minor', '-100', 'currency', 'EUR'),
+  jsonb_build_object('role', 'cash', 'account_id', :'acc', 'amount_minor', '100', 'currency', 'EUR')), null, 'settled', 'statement') as tx \gset
+set constraints all immediate;
+select is((select source || ':' || entered_by from public.transactions where id = :'tx'), 'statement:' || :'alicia', 'un movimiento guarda su origen y quién lo registró');
+select throws_ok(format($$update public.transactions set source = 'manual' where id = %L$$, :'tx'), '42501', null, 'y no se reescriben después');
+
+-- Regla por producto (la "justificación guardada" de una excepción)
+select lives_ok(format($$insert into public.advice_rules (space_id, template, scope, asset_id, metric, comparator, threshold, unit, status, paused_on, paused_reason) values (%L, 'high_fees', 'asset', %L, 'ter_bps', 'gt', 50, 'bps', 'paused', '2026-10-26', 'Lo mantengo por su fiscalidad')$$, :'sp', :'etf'),
+  'una regla puede aplicarse a un producto y pausarse con su justificación');
+
+-- Revisiones y listas de comprobación
+select throws_ok(format($$insert into public.tasks (space_id, kind, title, checklist) values (%L, 'todo', 'x', '{"tax_effect": true}')$$, :'sp'),
+  '23514', null, 'solo una lista de comprobación lleva respuestas');
+select lives_ok(format($$insert into public.tasks (space_id, kind, title, checklist) values (%L, 'checklist', 'Antes de traspasar', '{"tax_effect": true, "exit_fee": false}')$$, :'sp'),
+  'una lista de comprobación guarda sus respuestas');
+select lives_ok(format($$insert into public.tasks (space_id, kind, title, status, completed_at) values (%L, 'review', 'Revisión trimestral', 'done', now())$$, :'sp'),
+  'una revisión hecha queda registrada para la regla de revisión pendiente');
+
 -- Permisos por rol y aislamiento
 select tests.authenticate_as(:'vic');
 select throws_ok(format($$insert into public.pockets (space_id, name) values (%L, 'X')$$, :'sp'), '42501', null, 'solo lectura no crea bolsillos');
 select tests.authenticate_as(:'aser');
-select is((select count(*)::int from public.advice_rules), 1, 'el asesor vigente lee las reglas');
+select is((select count(*)::int from public.advice_rules), 2, 'el asesor vigente lee las reglas');
 select tests.authenticate_as(:'beto');
 select is((select count(*)::int from public.pockets where space_id = :'sp'), 0, 'otro espacio no ve los bolsillos');
 

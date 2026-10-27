@@ -44,16 +44,14 @@ begin
 end $f$;
 
 create function tests.seed_space(p_space uuid) returns void language plpgsql as $f$
-declare p1 uuid; p2 uuid; a1 uuid; a2 uuid; a3 uuid; ast uuid; g uuid; tx uuid; gl uuid; pl uuid; op uuid;
-        sc uuid; sop uuid; mp uuid; rec uuid; bt uuid; cat uuid; pk uuid;
+declare p1 uuid; p2 uuid; a1 uuid; a2 uuid; a3 uuid; ast uuid; tx uuid; pl uuid; op uuid;
+        rec uuid; bt uuid; cat uuid; pk uuid;
 begin
   insert into public.persons (space_id, display_name, kind) values (p_space, 'P1', 'adult') returning id into p1;
   insert into public.persons (space_id, display_name, kind) values (p_space, 'P2', 'minor') returning id into p2;
-  insert into public.account_groups (space_id, name) values (p_space, 'G') returning id into g;
   insert into public.accounts (space_id, name, kind, currency) values (p_space, 'A1', 'current', 'EUR') returning id into a1;
   insert into public.accounts (space_id, name, kind, currency) values (p_space, 'A2', 'brokerage', 'EUR') returning id into a2;
   insert into public.accounts (space_id, name, kind, currency) values (p_space, 'A3', 'mortgage', 'EUR') returning id into a3;
-  insert into public.account_group_members values (g, a1, p_space);
   insert into public.account_holders values (a1, p1, p_space, 'holder', 10000);
   insert into public.loan_terms (account_id, space_id, principal_minor, rate_type, annual_rate, term_months, start_on)
     values (a3, p_space, 1000, 'fixed', 0.03, 300, '2026-01-01');
@@ -67,32 +65,26 @@ begin
   insert into public.transaction_legs (transaction_id, space_id, role, amount_minor, currency) values (tx, p_space, 'external', -100, 'EUR');
   insert into public.transaction_legs (transaction_id, space_id, role, account_id, amount_minor, currency) values (tx, p_space, 'cash', a1, 100, 'EUR');
   insert into public.valuations (space_id, account_id, as_of, value_minor, currency) values (p_space, a1, '2026-01-01', 100, 'EUR');
-  insert into public.goals (space_id, kind, name, target_minor, currency) values (p_space, 'custom', 'G', 1, 'EUR') returning id into gl;
-  insert into public.pockets (space_id, name, kind, goal_id) values (p_space, 'Colchón', 'emergency', gl) returning id into pk;
+  insert into public.pockets (space_id, name, kind, person_id) values (p_space, 'Colchón', 'emergency', p1) returning id into pk;
   insert into public.pocket_allocations (space_id, pocket_id, account_id, weight_bps) values (p_space, pk, a1, 5000);
   insert into public.advice_rules (space_id, template, scope, pocket_id, metric, comparator, threshold, unit)
     values (p_space, 'emergency_fund_months', 'pocket', pk, 'x', 'lt', 6, 'months');
   insert into public.cash_rate_tiers (space_id, account_id, effective_from, rate_bps, currency, source)
     values (p_space, a1, '2026-01-01', 200, 'EUR', 'fuente');
-  insert into public.asset_fee_snapshots values (ast, p_space, '2026-01-01', 10, 'ficha', false, null, now(), now());
+  insert into public.asset_fact_sheets (asset_id, space_id, as_of, ter_bps, source) values (ast, p_space, '2026-01-01', 10, 'ficha');
   insert into public.assumptions (space_id, key, value, unit, effective_from) values (p_space, 'expected_inflation', 300, 'bps', '2026-01-01');
   insert into public.tasks (space_id, title) values (p_space, 't');
   insert into public.investment_plans (space_id, name, total_minor, currency, start_on) values (p_space, 'P', 100, 'EUR', '2026-01-01') returning id into pl;
   insert into public.planned_operations (space_id, plan_id, kind, planned_on, amount_minor, currency) values (p_space, pl, 'buy', '2026-01-01', 100, 'EUR') returning id into op;
   insert into public.planned_operation_allocations (operation_id, space_id, label, weight_bps) values (op, p_space, 'x', 10000);
-  insert into public.scenarios (space_id, name, base_date) values (p_space, 'S', '2026-01-01') returning id into sc;
-  insert into public.scenario_operations (scenario_id, space_id, kind, occurred_on) values (sc, p_space, 'adjustment', '2026-01-01') returning id into sop;
-  insert into public.scenario_legs (operation_id, space_id, role, account_id, amount_minor, currency) values (sop, p_space, 'cash', a1, 1, 'EUR');
-  insert into public.model_portfolios (space_id, name) values (p_space, 'M') returning id into mp;
-  insert into public.model_portfolio_weights values (mp, p_space, 'asset_class', 'equity', 10000);
   insert into public.asset_compositions values (ast, p_space, '2026-01-01', 'region', 'world', 10000, 'fuente');
   insert into public.risk_profiles (space_id, person_id, questionnaire_version) values (p_space, p1, 1);
   insert into public.recommendations (space_id, rule_id, rule_version, level, severity, inputs_hash, message_key, confidence)
     values (p_space, 'r', 1, 2, 'info', decode(repeat('0a', 32), 'hex'), 'k', 'high') returning id into rec;
   insert into public.recommendation_events (recommendation_id, space_id, event) values (rec, p_space, 'shown');
   insert into public.import_mappings (space_id, name, mapping) values (p_space, 'm', '{}');
-  insert into public.import_batches (space_id, account_id, file_sha256, storage_path)
-    values (p_space, a1, decode(repeat('01', 32), 'hex'), p_space::text || '/f.csv') returning id into bt;
+  insert into public.import_batches (space_id, account_id, file_kind, file_sha256, storage_path)
+    values (p_space, a1, 'csv', decode(repeat('01', 32), 'hex'), p_space::text || '/f.csv') returning id into bt;
   insert into public.import_rows (batch_id, space_id, account_id, row_index, fingerprint, status)
     values (bt, p_space, a1, 0, decode(repeat('02', 32), 'hex'), 'new');
   insert into public.space_invitations (space_id, email_normalized, role, token_hash, expires_at)

@@ -1,5 +1,5 @@
 -- =============================================================================
--- 5 · Bolsillos, reglas del usuario, tramos de remuneración, comisiones con fuente y procedencia.
+-- 5/5 · Bolsillos, reglas del usuario, tramos de remuneración, comisiones con fuente y procedencia.
 -- ADR-0017. Mismas reglas: FKs compuestas por espacio, RLS forzada, permisos mínimos.
 -- El dinero se organiza por bolsillos (función), no por entidades. Las reglas son datos sobre un
 -- catálogo cerrado de métricas (finance-core): no hay expresiones ni texto libre que se muestre.
@@ -41,26 +41,33 @@ create trigger asset_compositions_entered_by before insert or update on public.a
 grant update (needs_verification) on public.asset_compositions to authenticated;
 
 -- ---------------------------------------------------------------------------
--- Comisión total anual (TER) como instantánea con fuente y fecha
+-- Ficha de un producto: coste, riesgo y peor caída, como instantánea con fuente y fecha.
+-- Única fuente de estos datos (no se repiten en assets): el valor vigente es la ficha más reciente.
 -- ---------------------------------------------------------------------------
-create table public.asset_fee_snapshots (
+create table public.asset_fact_sheets (
   asset_id uuid not null,
   space_id uuid not null references public.spaces (id) on delete cascade,
   as_of date not null,
-  ter_bps integer not null check (ter_bps between 0 and 10000),
+  ter_bps integer check (ter_bps between 0 and 10000),
+  risk_indicator smallint check (risk_indicator between 1 and 7),
+  worst_drawdown_bps integer check (worst_drawdown_bps between 0 and 10000),
+  worst_drawdown_period text check (char_length(worst_drawdown_period) between 1 and 60),
   source text not null check (char_length(source) between 1 and 200),
   needs_verification boolean not null default false,
   entered_by uuid references auth.users (id) on delete set null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   primary key (asset_id, as_of),
-  foreign key (asset_id, space_id) references public.assets (id, space_id) on delete cascade
+  foreign key (asset_id, space_id) references public.assets (id, space_id) on delete cascade,
+  check (coalesce(ter_bps, risk_indicator, worst_drawdown_bps) is not null),
+  check ((worst_drawdown_bps is null) = (worst_drawdown_period is null))
 );
-comment on table public.asset_fee_snapshots is 'Comisión total anual de un producto en una fecha, tomada de su ficha (fuente obligatoria). Alimenta el coste ponderado de la cartera; assets.ter_bps es el valor vigente que el usuario ve. [financiero]';
-comment on column public.asset_fee_snapshots.entered_by is 'Quién introdujo el dato. [pii]';
-create index asset_fee_snapshots_asset_idx on public.asset_fee_snapshots (space_id, asset_id, as_of desc);
-create index asset_fee_snapshots_entered_by_idx on public.asset_fee_snapshots (entered_by) where entered_by is not null;
-create trigger asset_fee_snapshots_entered_by before insert or update on public.asset_fee_snapshots
+comment on table public.asset_fact_sheets is 'Datos de la ficha de un producto en una fecha (fuente obligatoria): comisión total anual (TER), indicador de riesgo 1-7 y peor caída histórica con su periodo. Sirve igual para productos que se tienen y para alternativas con las que comparar. [financiero]';
+comment on column public.asset_fact_sheets.ter_bps is 'Coste total anual en puntos básicos (96 = 0,96 %).';
+comment on column public.asset_fact_sheets.entered_by is 'Quién introdujo el dato. [pii]';
+create index asset_fact_sheets_asset_idx on public.asset_fact_sheets (space_id, asset_id, as_of desc);
+create index asset_fact_sheets_entered_by_idx on public.asset_fact_sheets (entered_by) where entered_by is not null;
+create trigger asset_fact_sheets_entered_by before insert or update on public.asset_fact_sheets
   for each row execute function private.set_entered_by();
 
 -- ---------------------------------------------------------------------------
@@ -111,34 +118,38 @@ create trigger cash_rate_tiers_currency before insert or update on public.cash_r
   for each row execute function private.trg_cash_tier_currency();
 
 -- ---------------------------------------------------------------------------
--- Bolsillos: objetivos con dinero asignado
+-- Bolsillos: el objetivo y el dinero asignado son la misma cosa (no hay tabla de objetivos aparte)
 -- ---------------------------------------------------------------------------
 create table public.pockets (
   id uuid primary key default gen_random_uuid(),
   space_id uuid not null references public.spaces (id) on delete cascade,
-  kind text not null default 'custom' check (kind in ('emergency', 'home', 'long_term', 'speculative', 'children', 'custom')),
+  kind text not null default 'custom' check (kind in (
+    'emergency', 'home', 'long_term', 'retirement', 'speculative', 'children', 'custom')),
   name text not null check (char_length(name) between 1 and 60),
   target_minor bigint check (target_minor between 0 and 1000000000000000),
   currency char(3) references ref.currencies (code),
   target_on date,
   risk_level text not null default 'medium' check (risk_level in ('none', 'low', 'medium', 'high', 'speculative')),
   horizon_years smallint check (horizon_years between 0 and 100),
-  goal_id uuid,
+  person_id uuid,
+  params jsonb not null default '{}'::jsonb check (jsonb_typeof(params) = 'object' and pg_column_size(params) <= 8192),
   sort_order smallint not null default 0,
   archived_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (id, space_id),
-  foreign key (goal_id, space_id) references public.goals (id, space_id) on delete set null (goal_id),
+  foreign key (person_id, space_id) references public.persons (id, space_id) on delete set null (person_id),
   check ((target_minor is null) = (currency is null)),
   check (target_on is null or target_minor is not null)
 );
-comment on table public.pockets is 'Bolsillo: función del dinero (colchón, casa, largo plazo, apuestas, hijas…) con objetivo opcional, riesgo permitido y horizonte. Las entidades solo son dónde está guardado. [financiero]';
+comment on table public.pockets is 'Bolsillo: función del dinero (colchón, casa, largo plazo, jubilación, apuestas, hijas…) con objetivo opcional (importe y fecha), riesgo permitido y horizonte. Las entidades solo son dónde está guardado. [financiero]';
 comment on column public.pockets.risk_level is 'Riesgo máximo que el usuario admite para el contenido del bolsillo; finance-core lo traduce a umbrales (ADR-0017).';
-comment on column public.pockets.goal_id is 'Objetivo de planificación asociado (jubilación, compra de vivienda…), si existe.';
+comment on column public.pockets.name is 'Nombre libre (p. ej., "Estudios de Lucía"). [pii]';
+comment on column public.pockets.person_id is 'Persona a la que sirve el bolsillo (p. ej., una hija), si aplica.';
+comment on column public.pockets.params is 'Supuestos propios del bolsillo para sus cálculos (p. ej., precio de la vivienda y entrada), validados con Zod. [financiero]';
 create unique index pockets_name_idx on public.pockets (space_id, name) where archived_at is null;
-create index pockets_space_idx on public.pockets (space_id, sort_order) where archived_at is null;
-create index pockets_goal_idx on public.pockets (space_id, goal_id) where goal_id is not null;
+create index pockets_space_idx on public.pockets (space_id, sort_order);
+create index pockets_person_idx on public.pockets (space_id, person_id) where person_id is not null;
 create index pockets_currency_idx on public.pockets (currency) where currency is not null;
 
 -- Parte de una cuenta (o de una posición) asignada a un bolsillo, en puntos básicos. Lo no asignado
@@ -212,9 +223,10 @@ create table public.advice_rules (
   id uuid primary key default gen_random_uuid(),
   space_id uuid not null references public.spaces (id) on delete cascade,
   template text not null check (template ~ '^[a-z0-9_.]{1,60}$'),
-  scope text not null check (scope in ('space', 'pocket', 'account')),
+  scope text not null check (scope in ('space', 'pocket', 'account', 'asset')),
   pocket_id uuid,
   account_id uuid,
+  asset_id uuid,
   metric text not null check (metric ~ '^[a-z0-9_.]{1,60}$'),
   comparator text not null check (comparator in ('gt', 'gte', 'lt', 'lte')),
   threshold numeric(24, 10) not null,
@@ -232,19 +244,24 @@ create table public.advice_rules (
   unique (id, space_id),
   foreign key (pocket_id, space_id) references public.pockets (id, space_id) on delete cascade,
   foreign key (account_id, space_id) references public.accounts (id, space_id) on delete cascade,
+  foreign key (asset_id, space_id) references public.assets (id, space_id) on delete cascade,
   check ((scope = 'pocket') = (pocket_id is not null)),
   check ((scope = 'account') = (account_id is not null)),
+  check ((scope = 'asset') = (asset_id is not null)),
   check ((unit = 'currency_minor') = (currency is not null)),
   check ((status = 'paused') = (paused_on is not null and paused_reason is not null)),
   check (status = 'paused' or (paused_on is null and paused_reason is null))
 );
 comment on table public.advice_rules is 'Regla editable: plantilla y métrica del catálogo cerrado de finance-core + umbral, severidad y ámbito. El texto del aviso sale del catálogo de mensajes; note es solo una anotación del usuario. Se pausa con motivo y fecha, no se borra (archived). [financiero]';
 comment on column public.advice_rules.template is 'Clave de la plantilla en finance-core (p. ej., emergency_fund_months). No es código ni expresión.';
+comment on column public.advice_rules.scope is 'A qué se aplica: todo el espacio, un bolsillo, una cuenta o un producto. Una regla por producto pausada con motivo es la "justificación guardada" de una excepción (p. ej., un fondo caro que se mantiene a propósito).';
 comment on column public.advice_rules.version is 'Se incrementa al cambiar la condición; los avisos guardan la versión con la que se emitieron.';
+comment on column public.advice_rules.paused_reason is 'Motivo libre de la pausa. [pii]';
 comment on column public.advice_rules.note is 'Anotación libre y acotada del usuario; nunca forma parte del texto de los avisos. [pii]';
 create index advice_rules_space_idx on public.advice_rules (space_id, status);
 create index advice_rules_pocket_idx on public.advice_rules (space_id, pocket_id) where pocket_id is not null;
 create index advice_rules_account_idx on public.advice_rules (space_id, account_id) where account_id is not null;
+create index advice_rules_asset_idx on public.advice_rules (space_id, asset_id) where asset_id is not null;
 create index advice_rules_currency_idx on public.advice_rules (currency) where currency is not null;
 
 create table public.advice_rule_revisions (
@@ -267,10 +284,10 @@ create function private.trg_advice_rule_version() returns trigger
 language plpgsql set search_path = ''
 as $$
 begin
-  if (new.template, new.scope, new.pocket_id, new.account_id, new.metric, new.comparator, new.threshold,
+  if (new.template, new.scope, new.pocket_id, new.account_id, new.asset_id, new.metric, new.comparator, new.threshold,
       new.unit, new.currency, new.min_duration_days, new.severity)
      is distinct from
-     (old.template, old.scope, old.pocket_id, old.account_id, old.metric, old.comparator, old.threshold,
+     (old.template, old.scope, old.pocket_id, old.account_id, old.asset_id, old.metric, old.comparator, old.threshold,
       old.unit, old.currency, old.min_duration_days, old.severity) then
     new.version := old.version + 1;
   else
@@ -314,7 +331,7 @@ create trigger advice_rules_revision after insert or update on public.advice_rul
 -- ---------------------------------------------------------------------------
 do $$
 begin
-  perform private.secure_space_table('asset_fee_snapshots');
+  perform private.secure_space_table('asset_fact_sheets');
   perform private.secure_space_table('cash_rate_tiers');
   perform private.secure_space_table('pockets');
   perform private.secure_space_table('pocket_allocations');
@@ -329,7 +346,7 @@ create policy advice_rules_update on public.advice_rules for update to authentic
 using (space_id = any ((select private.writable_space_ids())::uuid[]))
 with check (space_id = any ((select private.writable_space_ids())::uuid[]));
 grant insert on public.advice_rules to authenticated;
-grant update (template, scope, pocket_id, account_id, metric, comparator, threshold, unit, currency,
+grant update (template, scope, pocket_id, account_id, asset_id, metric, comparator, threshold, unit, currency,
               min_duration_days, severity, status, paused_on, paused_reason, note)
   on public.advice_rules to authenticated;
 
