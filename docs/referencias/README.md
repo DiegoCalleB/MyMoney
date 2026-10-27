@@ -21,7 +21,7 @@ Inventario de las fuentes del cuaderno de investigación, clasificadas por fiabi
 | [01-fiscalidad](01-fiscalidad.md) | IRPF, traspasos, FIFO, pérdidas, patrimonio, modelos 720/721 | `ref.tax_parameters`, cálculos de `finance-core` | borrador sin verificar |
 | [02-regulacion-avisos](02-regulacion-avisos.md) | Información frente a recomendación y asesoramiento (CNMV, MiFID II) | reglas de avisos, `reco-copy-guard` | borrador sin verificar |
 | [03-proteccion-datos](03-proteccion-datos.md) | RGPD, LOPDGDD, EIPD, decisiones automatizadas | EIPD, consentimientos, retención | borrador sin verificar |
-| 04-ia | Reglamento de IA, transparencia de textos generados | explicaciones con IA | pendiente |
+| [04-ia](04-ia.md) | Reglamento de IA, transparencia de textos generados | explicaciones con IA | borrador sin verificar |
 | 05-servicios-pago | PSD2, importar ficheros frente a conectar con bancos | hoja de ruta de importadores | pendiente |
 | 06-garantias | Fondo de Garantía de Depósitos y de Inversiones | avisos de concentración, tramos de efectivo | pendiente |
 | 07-metodologia | IPC (INE, Eurostat), tipos BCE, TAE, GIPS (TWR/XIRR) | `ref.inflation_index`, `ref.fx_rates`, `finance-core` | pendiente |
