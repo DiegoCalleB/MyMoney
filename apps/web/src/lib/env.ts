@@ -54,7 +54,11 @@ export function describePublicEnv(
  * dirección absoluta sin ruta. Si falta, solo en desarrollo se usa la local.
  */
 export function readAppOrigin(source: Record<string, string | undefined> = process.env): string {
-  const raw = source.APP_ORIGIN?.trim();
+  // Se toleran los fallos típicos al pegar en un panel: comillas y falta de "https://".
+  let raw = source.APP_ORIGIN?.trim()
+    .replace(/^["']+|["']+$/g, "")
+    .trim();
+  if (raw && !/^[a-z][a-z0-9+.-]*:\/\//i.test(raw)) raw = `https://${raw}`;
   if (!raw) {
     // En producción, un origen por defecto enviaría los enlaces del correo a localhost.
     if (source.NODE_ENV === "production") throw new Error("Falta APP_ORIGIN");

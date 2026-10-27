@@ -110,3 +110,20 @@ describe("espacios al pegar los valores", () => {
     ).toThrow(/clave secreta/);
   });
 });
+
+describe("APP_ORIGIN pegado con errores típicos", () => {
+  it("añade https:// si falta y quita las comillas", () => {
+    expect(readAppOrigin({ APP_ORIGIN: "mymoney-production-f2aa.up.railway.app" })).toBe(
+      "https://mymoney-production-f2aa.up.railway.app",
+    );
+    expect(readAppOrigin({ APP_ORIGIN: '"https://a.example.com/"' })).toBe("https://a.example.com");
+    expect(readAppOrigin({ APP_ORIGIN: "'a.example.com'" })).toBe("https://a.example.com");
+  });
+
+  it("sigue rechazando rutas, parámetros y otros protocolos", () => {
+    expect(() => readAppOrigin({ APP_ORIGIN: "a.example.com/registro" })).toThrow();
+    expect(() => readAppOrigin({ APP_ORIGIN: "https://a.example.com/?x=1" })).toThrow();
+    expect(() => readAppOrigin({ APP_ORIGIN: "ftp://a.example.com" })).toThrow();
+    expect(() => readAppOrigin({ APP_ORIGIN: "https://" })).toThrow();
+  });
+});
