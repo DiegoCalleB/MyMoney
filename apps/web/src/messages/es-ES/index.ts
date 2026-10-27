@@ -73,6 +73,11 @@ export const esES = {
   "mfa.enroll.secret": "Si no puedes escanearlo, escribe esta clave en la aplicación:",
   "mfa.enroll.confirm": "Activar",
   "mfa.enroll.failed": "No hemos podido iniciar la activación. Inténtalo de nuevo.",
+  "mfa.enroll.open_app": "Abrir en mi aplicación de autenticación",
+  "mfa.enroll.open_hint":
+    "En el móvil, con un toque se añade la cuenta. Si no se abre, usa la clave de abajo.",
+  "mfa.enroll.copy": "Copiar clave",
+  "mfa.enroll.copied": "Clave copiada",
   "mfa.code.label": "Código de 6 cifras",
   "mfa.verify.title": "Verificación en dos pasos",
   "mfa.verify.intro": "Escribe el código de 6 cifras que muestra tu aplicación de autenticación.",

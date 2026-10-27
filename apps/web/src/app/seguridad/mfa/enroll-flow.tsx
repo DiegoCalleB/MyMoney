@@ -5,6 +5,7 @@ import { startEnrollAction, type EnrollState } from "@/app/actions/mfa";
 import { FormAlert, SubmitButton } from "@/components/fields";
 import fields from "@/components/fields.module.css";
 import { TotpForm } from "@/app/verificar-mfa/totp-form";
+import { CopyButton } from "./copy-button";
 import { t } from "@/lib/i18n";
 import styles from "../../page.module.css";
 
@@ -23,11 +24,22 @@ export function EnrollFlow() {
   }
   return (
     <div className={styles.section}>
+      {enroll.uri ? (
+        <p>
+          <a className={styles.primary} href={enroll.uri}>
+            {t("mfa.enroll.open_app")}
+          </a>
+        </p>
+      ) : null}
+      <p className={styles.note}>{t("mfa.enroll.open_hint")}</p>
       <p>{t("mfa.enroll.scan")}</p>
       <img className={styles.qr} src={enroll.qr} alt={t("mfa.enroll.qr_alt")} />
       <p>{t("mfa.enroll.secret")}</p>
       <p>
         <code className={styles.secret}>{enroll.secret}</code>
+      </p>
+      <p>
+        <CopyButton value={enroll.secret} />
       </p>
       <TotpForm factorId={enroll.factorId} submitLabel={t("mfa.enroll.confirm")} />
     </div>

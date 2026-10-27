@@ -89,3 +89,9 @@ button.primary {
   padding: var(--space-2) var(--space-3);
   display: inline-block;
 }
+
+button.secondary {
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
