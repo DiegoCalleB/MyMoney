@@ -72,7 +72,10 @@ select is(
     where g.table_schema = 'public' and g.column_name in ('space_id', 'id', 'created_at')
       and g.table_name in (select table_name from information_schema.columns
                             where table_schema = 'public' and column_name = 'space_id')
-      and has_column_privilege('authenticated', format('public.%I', g.table_name), g.column_name, 'UPDATE')),
+      -- CASE fija el orden: sin él, el planificador puede evaluar el permiso sobre tablas de otros esquemas.
+      and case when g.table_schema = 'public'
+               then has_column_privilege('authenticated', format('public.%I', g.table_name), g.column_name, 'UPDATE')
+               else false end),
   '{}'::text[],
   'space_id, id y created_at no son actualizables por usuarios (el espacio de una fila es inmutable)'
 );
