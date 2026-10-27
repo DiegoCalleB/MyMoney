@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  ACCOUNT_KINDS,
   addAccountInput,
+  defaultLiquidity,
   createSpaceInput,
   isLiabilityKind,
   signInInput,
@@ -98,5 +100,19 @@ describe("addAccountInput", () => {
   it("identifica las deudas", () => {
     expect(isLiabilityKind("mortgage")).toBe(true);
     expect(isLiabilityKind("savings")).toBe(false);
+  });
+});
+
+describe("defaultLiquidity", () => {
+  it("da una liquidez razonable a cada tipo de cuenta", () => {
+    expect(defaultLiquidity("real_estate")).toBe("illiquid");
+    expect(defaultLiquidity("pension_plan")).toBe("illiquid");
+    expect(defaultLiquidity("deposit")).toBe("months");
+    expect(defaultLiquidity("brokerage")).toBe("days");
+    expect(defaultLiquidity("current")).toBe("immediate");
+    expect(defaultLiquidity("mortgage")).toBe("immediate");
+    for (const kind of ACCOUNT_KINDS) {
+      expect(["immediate", "days", "months", "illiquid"]).toContain(defaultLiquidity(kind));
+    }
   });
 });

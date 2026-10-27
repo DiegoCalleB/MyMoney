@@ -24,3 +24,21 @@ describe("readPublicEnv", () => {
     ).toThrow(/clave secreta/);
   });
 });
+
+import { readAppOrigin } from "@/lib/env";
+
+describe("readAppOrigin", () => {
+  it("usa el origen local si no hay configuración", () => {
+    expect(readAppOrigin({})).toBe("http://localhost:3000");
+  });
+  it("normaliza un origen válido", () => {
+    expect(readAppOrigin({ APP_ORIGIN: "https://mymoney.example.com/" })).toBe(
+      "https://mymoney.example.com",
+    );
+  });
+  it("rechaza rutas, parámetros y otros protocolos", () => {
+    expect(() => readAppOrigin({ APP_ORIGIN: "https://x.example.com/ruta" })).toThrow();
+    expect(() => readAppOrigin({ APP_ORIGIN: "https://x.example.com/?a=1" })).toThrow();
+    expect(() => readAppOrigin({ APP_ORIGIN: "ftp://x.example.com" })).toThrow();
+  });
+});

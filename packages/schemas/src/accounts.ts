@@ -43,3 +43,24 @@ export const addAccountInput = z.object({
   currentValue: amountText,
 });
 export type AddAccountInput = z.infer<typeof addAccountInput>;
+
+export type Liquidity = "immediate" | "days" | "months" | "illiquid";
+
+/** Liquidez por defecto al crear una cuenta: la persona no tiene que decidirla (regla 25). */
+export function defaultLiquidity(kind: AccountKind): Liquidity {
+  switch (kind) {
+    case "real_estate":
+    case "vehicle":
+    case "other_asset":
+    case "pension_plan":
+      return "illiquid";
+    case "deposit":
+      return "months";
+    case "brokerage":
+    case "fund_holding":
+    case "crypto":
+      return "days";
+    default:
+      return "immediate";
+  }
+}

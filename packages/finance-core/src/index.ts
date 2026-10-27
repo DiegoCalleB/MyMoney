@@ -4,3 +4,4 @@ export * from "./money";
 export * from "./calendar-date";
 export * from "./fx";
 export * from "./net-worth";
+export * from "./amount-input";

@@ -28,3 +28,17 @@ export function readPublicEnv(
   }
   return null;
 }
+
+/**
+ * Origen público de la web, para los enlaces de los correos de confirmación. Debe ser una
+ * dirección absoluta sin ruta; si falta, se usa la local de desarrollo.
+ */
+export function readAppOrigin(source: Record<string, string | undefined> = process.env): string {
+  const raw = source.APP_ORIGIN;
+  if (!raw) return "http://localhost:3000";
+  const url = new URL(raw);
+  if (url.pathname !== "/" || url.search || url.hash || !/^https?:$/.test(url.protocol)) {
+    throw new Error("APP_ORIGIN debe ser un origen http(s) sin ruta");
+  }
+  return url.origin;
+}
