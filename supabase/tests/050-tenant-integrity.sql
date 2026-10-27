@@ -26,7 +26,10 @@ select is(
          where i.indrelid = c.conrelid and i.indisvalid
            -- Un índice parcial solo sirve si su condición es "columna IS NOT NULL" (la implica la búsqueda
            -- por igualdad de la FK). Con otra condición (p. ej., "solo activas") el borrado en cascada no lo usa.
-           and (i.indpred is null or pg_get_expr(i.indpred, i.indrelid) ~ '^\(\w+ IS NOT NULL\)$')
+           and (i.indpred is null
+                or substring(pg_get_expr(i.indpred, i.indrelid) from '^\((\w+) IS NOT NULL\)$') in (
+                     select a.attname from pg_attribute a
+                      where a.attrelid = c.conrelid and a.attnum = any (c.conkey)))
            and (select array_agg(k order by k)
                   from unnest((string_to_array(i.indkey::text, ' ')::int2[])[1:cardinality(c.conkey)]) k)
              = (select array_agg(k order by k) from unnest(c.conkey) k))),
@@ -94,7 +97,7 @@ select throws_ok(
 
 insert into public.pockets (space_id, name) values (:'space_b', 'Bolsillo B') returning id as pk_b \gset
 select throws_ok(
-  format($$insert into public.pocket_allocations (space_id, pocket_id, account_id, weight_bps) values (%L, %L, %L, 5000)$$, :'space_b', :'pk_b', :'acc_a'),
+  format($$insert into public.pocket_allocations (space_id, pocket_id, account_id, effective_from, weight_bps) values (%L, %L, %L, '2026-01-01', 5000)$$, :'space_b', :'pk_b', :'acc_a'),
   '23503', null, 'un bolsillo del espacio B no puede repartir una cuenta del espacio A');
 select throws_ok(
   format($$insert into public.advice_rules (space_id, template, scope, pocket_id, metric, comparator, threshold, unit) values (%L, 't', 'pocket', %L, 'm', 'lt', 1, 'count')$$, :'space_a', :'pk_b'),

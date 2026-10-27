@@ -83,6 +83,23 @@ create unique index persons_linked_user_idx on public.persons (space_id, linked_
 create index persons_linked_user_fk_idx on public.persons (linked_user_id) where linked_user_id is not null;
 
 -- ---------------------------------------------------------------------------
+-- Entidades: dónde está guardado el dinero
+-- ---------------------------------------------------------------------------
+create table public.institutions (
+  id uuid primary key default gen_random_uuid(),
+  space_id uuid not null references public.spaces (id) on delete cascade,
+  name text not null check (char_length(name) between 1 and 80),
+  kind text not null default 'bank' check (kind in (
+    'bank', 'broker', 'fund_manager', 'pension_manager', 'insurer', 'exchange', 'other')),
+  country_code char(2) check (country_code ~ '^[A-Z]{2}$'),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (id, space_id),
+  unique (space_id, name)
+);
+comment on table public.institutions is 'Entidad donde está guardado el dinero (banco, bróker, gestora, aseguradora, exchange). Una sola fila por entidad: la concentración por entidad y el límite del fondo de garantía (por entidad y titular) se calculan sobre ella. El país señala cuentas en el extranjero (información fiscal). [financiero]';
+
+-- ---------------------------------------------------------------------------
 -- Cuentas
 -- ---------------------------------------------------------------------------
 create table public.accounts (
@@ -94,7 +111,7 @@ create table public.accounts (
     'real_estate', 'vehicle', 'other_asset', 'mortgage', 'loan', 'credit_card')),
   is_liability boolean generated always as (kind in ('mortgage', 'loan', 'credit_card')) stored,
   currency char(3) not null references ref.currencies (code),
-  institution_name text check (char_length(institution_name) <= 80),
+  institution_id uuid,
   iban_last4 text check (iban_last4 ~ '^[0-9A-Za-z]{4}$'),
   liquidity text not null default 'immediate' check (liquidity in ('immediate', 'days', 'months', 'illiquid')),
   tax_wrapper text not null default 'none' check (tax_wrapper in (
@@ -106,6 +123,7 @@ create table public.accounts (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (id, space_id),
+  foreign key (institution_id, space_id) references public.institutions (id, space_id) on delete set null (institution_id),
   check (closed_on is null or opened_on is null or closed_on >= opened_on)
 );
 comment on table public.accounts is 'Cuentas, posiciones agrupadas por entidad, inmuebles y deudas. [financiero]';
@@ -114,6 +132,7 @@ comment on column public.accounts.scope is 'household = cuenta del hogar (entra 
 comment on column public.accounts.iban_last4 is 'Solo los 4 últimos caracteres, opcional. Nunca el IBAN completo. [pii]';
 create index accounts_space_idx on public.accounts (space_id);
 create index accounts_currency_idx on public.accounts (currency);
+create index accounts_institution_idx on public.accounts (space_id, institution_id) where institution_id is not null;
 
 create table public.account_holders (
   account_id uuid not null,
@@ -545,6 +564,7 @@ create trigger accounts_audit after insert or delete on public.accounts
 do $$
 begin
   perform private.secure_space_table('persons');
+  perform private.secure_space_table('institutions');
   perform private.secure_space_table('accounts');
   perform private.secure_space_table('account_holders');
   perform private.secure_space_table('loan_terms');

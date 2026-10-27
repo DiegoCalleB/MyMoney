@@ -48,12 +48,20 @@ Fecha: 2026-10-26. Alcance: las 4 migraciones de `supabase/migrations/` (43 tabl
 - **Seguridad:** sin SQL dinámico en las validaciones de sumas; 17 textos libres etiquetados `[pii]`.
 - **Comprobación:** el esquema que resulta de pegar el archivo único es idéntico (volcado de esquema) al de aplicar las cinco migraciones por separado.
 
+## 3 ter. Segunda revisión (27-10-2026, ADR-0019)
+
+- **Históricos para rentabilidad real:** el reparto de bolsillos tiene vigencia (`effective_from`); junto con movimientos, valoraciones, tipos de cambio e IPC fechados, la rentabilidad nominal y real de cada bolsillo es reproducible en cualquier fecha.
+- **Entidades normalizadas** (`institutions`) para concentración y fondo de garantía.
+- **Avisos enlazados** con la regla del usuario; una sola definición de `upsert_recommendation`.
+- **IA:** consentimiento demostrable y revocable (`user_consents`) y una única puerta (`ai_explanations_allowed`).
+- **Tests de catálogo más estrictos:** un índice parcial solo cuenta como apoyo de una FK si su condición es `IS NOT NULL` sobre una columna de esa FK.
+
 ## 4. Pruebas
 
 | Capa | Qué hay | Resultado |
 |---|---|---|
-| pgTAP | 15 archivos, **296 tests**: metatests de catálogo (RLS forzada, FKs compuestas con índice utilizable, sin índices redundantes, vistas `security_invoker`, políticas envueltas, funciones sin `search_path` mutable, anon sin permisos), aislamiento **generado para cada tabla** con un fixture obligatorio, roles (propietario, editor, solo lectura, asesor vigente y caducado), invitaciones, auditoría, libro, ingresos y gastos, importaciones, Storage, borrado de cuenta y planes de ejecución | Verde |
-| Mutación | `scripts/db-mutation-check.py`: 22 fallos introducidos a propósito (política abierta, RLS sin forzar, FK sin espacio, escritura directa, descuadre permitido, nivel 3 permitido, bucket abierto, MFA omitido, auditoría borrable, reparto de bolsillos > 100 %, procedencia falsificable, historial de reglas escribible, hipótesis marcada como hecha, índice parcial como único apoyo de una FK…) | **22/22 detectados** |
+| pgTAP | 15 archivos, **308 tests**: metatests de catálogo (RLS forzada, FKs compuestas con índice utilizable, sin índices redundantes, vistas `security_invoker`, políticas envueltas, funciones sin `search_path` mutable, anon sin permisos), aislamiento **generado para cada tabla** con un fixture obligatorio, roles (propietario, editor, solo lectura, asesor vigente y caducado), invitaciones, auditoría, libro, ingresos y gastos, importaciones, Storage, borrado de cuenta y planes de ejecución | Verde |
+| Mutación | `scripts/db-mutation-check.py`: 25 fallos introducidos a propósito (política abierta, RLS sin forzar, FK sin espacio, escritura directa, descuadre permitido, nivel 3 permitido, bucket abierto, MFA omitido, auditoría borrable, reparto de bolsillos > 100 %, procedencia falsificable, historial de reglas escribible, hipótesis marcada como hecha, índice parcial como único apoyo de una FK, consentimiento en nombre de otro, reparto histórico mezclado, entidad duplicada…) | **25/25 detectados** |
 | Dominio | `finance-core`: 37 tests de ejemplos y propiedades | Verde, 100 % de líneas y ramas |
 | Verificación en el entorno real | `supabase/verify/001-security-checks.sql` (solo lectura) | 0 filas esperadas tras aplicar |
 

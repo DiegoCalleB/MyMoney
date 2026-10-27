@@ -46,6 +46,13 @@ TWR = Πⱼ (1 + Rⱼ) − 1, con Rⱼ = (V_fin,j − V_ini,j − F_j) / V_ini,j
 
 **Rentabilidad real**
 r_real = (1 + r_nominal) / (1 + π) − 1, con π la inflación del mismo periodo a partir del índice del INE: π = IPC(fin) / IPC(inicio) − 1. **No** se usa la resta aproximada r − π salvo para explicar.
+
+**Rendimiento por bolsillo (ADR-0019)**
+Un bolsillo no es una cuenta: es una parte de varias cuentas, y esa parte cambia con el tiempo. Para cada fecha *d* se toma el reparto vigente de cada cuenta (`pocket_allocations` con el mayor `effective_from` ≤ *d*):
+- Valor del bolsillo en *d* = Σ valor de la cuenta (o posición) en *d* × peso vigente en *d*.
+- Flujos del bolsillo = flujos externos de cada cuenta × peso vigente en su fecha, **más** las reasignaciones: si en *d* cambia el reparto, lo que entra en un bolsillo y sale de otro es un flujo para ambos (como un traspaso), así una reasignación no se confunde con rentabilidad.
+- Con valores y flujos, XIRR y TWR del bolsillo se calculan con las mismas funciones que las de una cuenta, y su rentabilidad real se deflacta con el IPC del mismo periodo.
+- Si falta la valoración de una cuenta en una fecha necesaria, el resultado baja su calidad del dato y lo dice; no interpola en silencio.
 - Desfase de publicación del IPC: se usa el último mes publicado y se indica ("IPC hasta agosto de 2026").
 - Para periodos que no empiezan el día 1 se interpola linealmente dentro del mes y se documenta.
 

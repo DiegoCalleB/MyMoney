@@ -59,7 +59,7 @@ MUTATIONS = [
      "using (true);"),
     ("nivel 3 de avisos permitido en la tabla", PLANNING,
      "  level smallint not null check (level between 1 and 2),", "  level smallint not null check (level between 1 and 3),"),
-    ("RPC de avisos sin comprobar flags", PLANNING,
+    ("RPC de avisos sin comprobar flags", POCKETS,
      "  if p_level not between 1 and 2 or not public.feature_enabled('reco.level' || p_level::text, p_space_id) then",
      "  if p_level not between 1 and 3 then"),
     ("bucket legible por cualquier usuario autenticado", IMPORTS,
@@ -72,7 +72,7 @@ MUTATIONS = [
      "  raise exception 'audit.events es de solo inserción' using errcode = 'insufficient_privilege';",
      "  return old;"),
     ("reparto de bolsillos por encima del 100 %", POCKETS,
-     "  if v_sum > 10000 then\n    raise exception 'Lo asignado", "  if false then\n    raise exception 'Lo asignado"),
+     "  if v_over > 10000 then\n    raise exception 'Lo asignado", "  if false then\n    raise exception 'Lo asignado"),
     ("procedencia elegida por el cliente", POCKETS,
      "  new.entered_by := coalesce((select auth.uid()), new.entered_by);", "  null;"),
     ("historial de reglas escribible por usuarios", POCKETS,
@@ -85,6 +85,15 @@ MUTATIONS = [
     ("índice parcial como único apoyo de una FK", LEDGER,
      "create index accounts_space_idx on public.accounts (space_id);",
      "create index accounts_space_idx on public.accounts (space_id) where archived_at is null;"),
+    ("consentimiento en nombre de otro usuario", POCKETS,
+     "with check (user_id = (select auth.uid()) and withdrawn_at is null);",
+     "with check (withdrawn_at is null);"),
+    ("reparto histórico ignorado (todas las fechas mezcladas)", POCKETS,
+     "  join latest l on l.account_id = a.account_id and l.effective_from = a.effective_from",
+     "  join latest l on l.account_id = a.account_id"),
+    ("entidad duplicada permitida", LEDGER,
+     "  unique (id, space_id),\n  unique (space_id, name)\n);\ncomment on table public.institutions",
+     "  unique (id, space_id)\n);\ncreate index institutions_space_idx on public.institutions (space_id);\ncomment on table public.institutions"),
 ]
 
 

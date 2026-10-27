@@ -66,7 +66,8 @@ begin
   insert into public.transaction_legs (transaction_id, space_id, role, account_id, amount_minor, currency) values (tx, p_space, 'cash', a1, 100, 'EUR');
   insert into public.valuations (space_id, account_id, as_of, value_minor, currency) values (p_space, a1, '2026-01-01', 100, 'EUR');
   insert into public.pockets (space_id, name, kind, person_id) values (p_space, 'Colchón', 'emergency', p1) returning id into pk;
-  insert into public.pocket_allocations (space_id, pocket_id, account_id, weight_bps) values (p_space, pk, a1, 5000);
+  insert into public.institutions (space_id, name) values (p_space, 'Entidad');
+  insert into public.pocket_allocations (space_id, pocket_id, account_id, effective_from, weight_bps) values (p_space, pk, a1, '2026-01-01', 5000);
   insert into public.advice_rules (space_id, template, scope, pocket_id, metric, comparator, threshold, unit)
     values (p_space, 'emergency_fund_months', 'pocket', pk, 'x', 'lt', 6, 'months');
   insert into public.cash_rate_tiers (space_id, account_id, effective_from, rate_bps, currency, source)

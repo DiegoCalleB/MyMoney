@@ -1,6 +1,6 @@
 -- ADR-0017: bolsillos, reparto, reglas con historial, tramos de remuneración y procedencia.
 begin;
-select plan(36);
+select plan(48);
 
 select tests.create_user('alicia@example.test') as alicia \gset
 select tests.create_user('vic@example.test') as vic \gset
@@ -42,23 +42,33 @@ select throws_ok(
 
 -- Reparto entre bolsillos
 select lives_ok(format($q$do $b$ begin
-  insert into public.pocket_allocations (space_id, pocket_id, account_id, weight_bps) values (%L, %L, %L, 6000);
-  insert into public.pocket_allocations (space_id, pocket_id, account_id, weight_bps) values (%L, %L, %L, 4000);
+  insert into public.pocket_allocations (space_id, pocket_id, account_id, effective_from, weight_bps) values (%L, %L, %L, '2026-01-01', 6000);
+  insert into public.pocket_allocations (space_id, pocket_id, account_id, effective_from, weight_bps) values (%L, %L, %L, '2026-01-01', 4000);
 end $b$$q$, :'sp', :'cush', :'acc', :'sp', :'home', :'acc'),
   'una cuenta puede repartirse entre dos bolsillos hasta el 100 %');
 select throws_ok(
-  format($$insert into public.pocket_allocations (space_id, pocket_id, account_id, weight_bps) values (%L, %L, %L, 1)$$, :'sp', :'lt', :'acc'),
+  format($$insert into public.pocket_allocations (space_id, pocket_id, account_id, effective_from, weight_bps) values (%L, %L, %L, '2026-01-01', 1)$$, :'sp', :'lt', :'acc'),
   '23514', null, 'no se puede asignar más del 100 % de una cuenta');
 select lives_ok(format($q$do $b$ begin
-  insert into public.pocket_allocations (space_id, pocket_id, account_id, weight_bps) values (%L, %L, %L, 3000);
+  insert into public.pocket_allocations (space_id, pocket_id, account_id, effective_from, weight_bps) values (%L, %L, %L, '2026-01-01', 3000);
 end $b$$q$, :'sp', :'lt', :'brk'),
   'asignar menos del 100 % es válido: el resto es efectivo sin función');
 select throws_ok(
-  format($$insert into public.pocket_allocations (space_id, pocket_id, account_id, asset_id, weight_bps) values (%L, %L, %L, %L, 1000)$$, :'sp', :'lt', :'brk', :'etf'),
+  format($$insert into public.pocket_allocations (space_id, pocket_id, account_id, asset_id, effective_from, weight_bps) values (%L, %L, %L, %L, '2026-01-01', 1000)$$, :'sp', :'lt', :'brk', :'etf'),
   '23514', null, 'una cuenta no se reparte a la vez entera y por posiciones');
 select throws_ok(
-  format($$insert into public.pocket_allocations (space_id, pocket_id, account_id, weight_bps) values (%L, %L, %L, 100)$$, :'sp', :'lt', :'brk'),
+  format($$insert into public.pocket_allocations (space_id, pocket_id, account_id, effective_from, weight_bps) values (%L, %L, %L, '2026-01-01', 100)$$, :'sp', :'lt', :'brk'),
   '23505', null, 'no se repite la asignación del mismo destino al mismo bolsillo');
+
+-- Historial del reparto (para el rendimiento de cada bolsillo en el pasado)
+select lives_ok(format($$insert into public.pocket_allocations (space_id, pocket_id, account_id, effective_from, weight_bps) values (%L, %L, %L, '2026-06-01', 10000)$$, :'sp', :'lt', :'acc'),
+  'cambiar el reparto añade un conjunto nuevo con su fecha');
+select is((select array_agg(weight_bps order by weight_bps) from public.pocket_allocations_on(:'sp', '2026-03-01') where account_id = :'acc'),
+  array[4000, 6000], 'en marzo rige el reparto antiguo (colchón 60 %, casa 40 %)');
+select is((select array_agg(pocket_id) from public.pocket_allocations_on(:'sp', '2026-07-01') where account_id = :'acc'),
+  array[:'lt'::uuid], 'desde junio rige el nuevo (todo a largo plazo)');
+select lives_ok(format($$insert into public.pocket_allocations (space_id, pocket_id, account_id, asset_id, effective_from, weight_bps) values (%L, %L, %L, %L, '2026-06-01', 10000)$$, :'sp', :'lt', :'brk', :'etf'),
+  'en otra fecha la cuenta puede pasar a repartirse por posiciones');
 
 -- Reglas
 insert into public.advice_rules (space_id, template, scope, pocket_id, metric, comparator, threshold, unit, severity)
@@ -110,6 +120,28 @@ insert into public.valuations (space_id, account_id, as_of, value_minor, currenc
   values (:'sp', :'acc', '2026-10-25', 100, 'EUR', 'statement', :'beto'::uuid) returning id as val \gset
 select is((select entered_by from public.valuations where id = :'val'), :'alicia'::uuid, 'un cliente no puede atribuir un dato a otro usuario');
 select throws_ok(format($$update public.valuations set entered_by = %L where id = %L$$, :'beto', :'val'), '42501', null, 'ni reescribir la procedencia después');
+
+-- Entidades
+insert into public.institutions (space_id, name, kind, country_code) values (:'sp', 'Banco de prueba', 'bank', 'ES') returning id as inst \gset
+select throws_ok(format($$insert into public.institutions (space_id, name) values (%L, 'Banco de prueba')$$, :'sp'),
+  '23505', null, 'una entidad no se repite en el espacio (la concentración por entidad cuadra)');
+select lives_ok(format($$update public.accounts set institution_id = %L where id = %L$$, :'inst', :'acc'), 'una cuenta apunta a su entidad');
+
+-- Avisos enlazados con la regla del usuario que los generó
+select public.upsert_recommendation(:'sp', 'emergency_fund_months', 2, 2::smallint, 'attention', decode(repeat('ab', 32), 'hex'),
+  '{}', '{}', 'reco.emergency_fund', '{}', 'high', :'rule') as rec \gset
+select is((select advice_rule_id from public.recommendations where id = :'rec'), :'rule'::uuid, 'el aviso guarda la regla que lo generó');
+
+-- Consentimiento para IA (por usuario, revocable) y puerta única
+select lives_ok(format($$insert into public.user_consents (user_id, purpose, policy_version) values (%L, 'ai_explanations', 1)$$, :'alicia'),
+  'el usuario da su consentimiento');
+select throws_ok(format($$insert into public.user_consents (user_id, purpose, policy_version) values (%L, 'ai_explanations', 1)$$, :'alicia'),
+  '23505', null, 'un solo consentimiento vigente por propósito');
+select throws_ok(format($$insert into public.user_consents (user_id, purpose, policy_version) values (%L, 'ai_explanations', 1)$$, :'beto'),
+  '42501', null, 'nadie consiente en nombre de otro');
+select is(public.ai_explanations_allowed(:'sp'), false, 'con consentimiento pero la IA desactivada por flag, no se usa');
+update public.user_consents set withdrawn_at = now() where user_id = :'alicia';
+select is((select count(*)::int from public.user_consents where withdrawn_at is null), 0, 'el consentimiento se retira y queda constancia');
 
 -- Procedencia de los movimientos (el cuadre se valida al final de la transacción, como en producción)
 set constraints all deferred;

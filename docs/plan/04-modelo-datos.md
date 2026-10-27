@@ -6,6 +6,7 @@
 > - Todas las tablas tienen `space_id not null`: **no hay catálogo global de activos** (evita referencias entre espacios; un catálogo futuro irá en `ref.*`).
 > - **FKs compuestas** `(xxx_id, space_id)` en todas las relaciones entre tablas con `space_id`.
 > - **Un concepto por cosa (ADR-0018):** los **bolsillos** (`pockets`, `pocket_allocations`) sustituyen a objetivos (`goals`, `goal_accounts`) y a grupos de cuentas (`account_groups`); las hipótesis son planes `what_if` (sin tablas `scenario_*`); las alternativas con las que comparar son activos con su ficha (sin `model_portfolios`); coste, riesgo y peor caída viven solo en `asset_fact_sheets`. `accounts.scope` distingue cuentas del hogar de datos ajenos (`external`).
+> - Reparto de bolsillos con vigencia, entidades normalizadas (`institutions`), avisos enlazados con su regla y consentimiento para IA (`user_consents`) (ADR-0019).
 > - Reglas del usuario con historial (`advice_rules`, `advice_rule_revisions`), tramos de remuneración (`cash_rate_tiers`) y procedencia (`source`, `entered_by`, `needs_verification`, `import_batch_id`) (ADR-0017).
 > - Ingresos y gastos: `categories`, `transaction_legs.category_id`, `category_budgets`, `recurring_rules`, `categorization_rules` (ADR-0016).
 > - Avisos con `level` limitado a 1-2 también en la tabla.
@@ -223,7 +224,9 @@ Ejemplos:
 | Tabla | Columnas principales |
 |-------|----------------------|
 | `pockets` | `kind` (`emergency`, `home`, `long_term`, `retirement`, `speculative`, `children`, `custom`), `name`, `target_minor`/`currency`/`target_on` (opcionales), `risk_level`, `horizon_years`, `person_id null`, `params jsonb` (supuestos del bolsillo, Zod) |
-| `pocket_allocations` | `pocket_id`, `account_id`, `asset_id null`, `weight_bps` (suma ≤ 10000 por destino; cuenta entera o por posiciones) |
+| `pocket_allocations` | `pocket_id`, `account_id`, `asset_id null`, `effective_from`, `weight_bps` (por conjunto: suma ≤ 10000 por destino; cuenta entera o por posiciones). Historial completo: `pocket_allocations_on(espacio, fecha)` da el vigente (ADR-0019) |
+| `institutions` | `name` (único), `kind`, `country_code` (ADR-0019) |
+| `user_consents` | `user_id`, `purpose` (`ai_explanations`), `policy_version`, `granted_at`, `withdrawn_at`; RLS por usuario |
 | `advice_rules` | `template`, `scope` (`space`, `pocket`, `account`, `asset`), `metric`, `comparator`, `threshold`, `unit`, `min_duration_days`, `severity`, `status` (activa/pausada con motivo y fecha/archivada), `version` |
 | `advice_rule_revisions` | Historial por trigger (solo lectura) |
 | `cash_rate_tiers` | `account_id`, `effective_from`, `up_to_minor null`, `rate_bps`, `source`, `needs_verification` |

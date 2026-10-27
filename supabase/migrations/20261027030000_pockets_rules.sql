@@ -152,46 +152,55 @@ create index pockets_space_idx on public.pockets (space_id, sort_order);
 create index pockets_person_idx on public.pockets (space_id, person_id) where person_id is not null;
 create index pockets_currency_idx on public.pockets (currency) where currency is not null;
 
--- Parte de una cuenta (o de una posición) asignada a un bolsillo, en puntos básicos. Lo no asignado
--- es "efectivo sin función": la interfaz lo muestra y las reglas pueden avisar.
+-- Reparto de cada cuenta entre bolsillos, CON VIGENCIA: para calcular el rendimiento histórico de un
+-- bolsillo hay que saber qué parte de cada cuenta le correspondía en cada fecha.
+-- El reparto de una cuenta en una fecha d es el conjunto de sus filas con el mayor effective_from <= d.
+-- Cambiar el reparto = añadir un conjunto nuevo con otra fecha; los anteriores quedan como historial.
+-- Lo no asignado es "efectivo sin función": la interfaz lo muestra y las reglas pueden avisar.
 create table public.pocket_allocations (
   id uuid primary key default gen_random_uuid(),
   space_id uuid not null references public.spaces (id) on delete cascade,
   pocket_id uuid not null,
   account_id uuid not null,
   asset_id uuid,
-  weight_bps integer not null check (weight_bps between 1 and 10000),
+  effective_from date not null,
+  weight_bps integer not null check (weight_bps between 0 and 10000),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  unique nulls not distinct (pocket_id, account_id, asset_id),
+  unique nulls not distinct (pocket_id, account_id, asset_id, effective_from),
   foreign key (pocket_id, space_id) references public.pockets (id, space_id) on delete cascade,
   foreign key (account_id, space_id) references public.accounts (id, space_id) on delete cascade,
   foreign key (asset_id, space_id) references public.assets (id, space_id) on delete cascade
 );
-comment on table public.pocket_allocations is 'Reparto de una cuenta (asset_id nulo) o de una posición entre bolsillos. Por destino la suma es ≤ 10000 pb; una cuenta se reparte entera o por posiciones, nunca de las dos formas. [financiero]';
+comment on table public.pocket_allocations is 'Reparto de una cuenta (asset_id nulo) o de sus posiciones entre bolsillos, vigente desde effective_from hasta el siguiente conjunto de la misma cuenta. En cada conjunto, por destino la suma es ≤ 10000 pb y la cuenta se reparte entera o por posiciones, nunca de las dos formas. weight_bps = 0 deja constancia de que algo dejó de estar asignado. [financiero]';
+comment on column public.pocket_allocations.effective_from is 'Fecha contable desde la que rige este conjunto de reparto de la cuenta.';
+create index pocket_allocations_account_idx on public.pocket_allocations (space_id, account_id, effective_from desc);
 create index pocket_allocations_pocket_idx on public.pocket_allocations (space_id, pocket_id);
-create index pocket_allocations_account_idx on public.pocket_allocations (space_id, account_id);
 create index pocket_allocations_asset_idx on public.pocket_allocations (space_id, asset_id) where asset_id is not null;
 
-create function private.validate_pocket_allocations(p_space uuid, p_account uuid, p_asset uuid)
+create function private.validate_pocket_allocations(p_space uuid, p_account uuid, p_from date)
 returns void
 language plpgsql security definer set search_path = ''
--- security definer: lee todas las filas del destino aunque el usuario no las vea; solo valida y no devuelve datos.
+-- security definer: lee todas las filas del conjunto aunque el usuario no las vea; solo valida y no devuelve datos.
 as $$
 declare
-  v_sum bigint;
+  v_over bigint;
   v_account_level boolean;
   v_asset_level boolean;
 begin
-  select coalesce(sum(weight_bps), 0) into v_sum
-  from public.pocket_allocations
-  where space_id = p_space and account_id = p_account and asset_id is not distinct from p_asset;
-  if v_sum > 10000 then
-    raise exception 'Lo asignado a bolsillos supera el 100 %% (% pb)', v_sum using errcode = 'check_violation';
+  select max(t.total) into v_over
+  from (
+    select sum(a.weight_bps) as total
+    from public.pocket_allocations a
+    where a.space_id = p_space and a.account_id = p_account and a.effective_from = p_from
+    group by a.asset_id
+  ) t;
+  if v_over > 10000 then
+    raise exception 'Lo asignado a bolsillos supera el 100 %% (% pb)', v_over using errcode = 'check_violation';
   end if;
-  select bool_or(asset_id is null), bool_or(asset_id is not null) into v_account_level, v_asset_level
-  from public.pocket_allocations
-  where space_id = p_space and account_id = p_account;
+  select bool_or(a.asset_id is null), bool_or(a.asset_id is not null) into v_account_level, v_asset_level
+  from public.pocket_allocations a
+  where a.space_id = p_space and a.account_id = p_account and a.effective_from = p_from;
   if v_account_level and v_asset_level then
     raise exception 'Una cuenta se reparte entera o por posiciones, no de las dos formas' using errcode = 'check_violation';
   end if;
@@ -204,10 +213,10 @@ language plpgsql security definer set search_path = ''
 as $$
 begin
   if tg_op <> 'INSERT' then
-    perform private.validate_pocket_allocations(old.space_id, old.account_id, old.asset_id);
+    perform private.validate_pocket_allocations(old.space_id, old.account_id, old.effective_from);
   end if;
   if tg_op <> 'DELETE' then
-    perform private.validate_pocket_allocations(new.space_id, new.account_id, new.asset_id);
+    perform private.validate_pocket_allocations(new.space_id, new.account_id, new.effective_from);
   end if;
   return null;
 end;
@@ -215,6 +224,28 @@ $$;
 create constraint trigger pocket_allocations_validate
   after insert or update or delete on public.pocket_allocations
   deferrable initially deferred for each row execute function private.trg_pocket_allocations();
+
+-- Reparto vigente en una fecha (por defecto, hoy en la zona horaria del espacio). security invoker:
+-- aplica la RLS de quien consulta. Es la vista que usa la pantalla de bolsillos.
+create function public.pocket_allocations_on(p_space_id uuid, p_on date default null)
+returns table (pocket_id uuid, account_id uuid, asset_id uuid, weight_bps integer, effective_from date)
+language sql stable set search_path = ''
+as $$
+  with d as (
+    select coalesce(p_on, (now() at time zone s.timezone)::date) as on_date
+    from public.spaces s where s.id = p_space_id
+  ), latest as (
+    select a.account_id, max(a.effective_from) as effective_from
+    from public.pocket_allocations a, d
+    where a.space_id = p_space_id and a.effective_from <= d.on_date
+    group by a.account_id
+  )
+  select a.pocket_id, a.account_id, a.asset_id, a.weight_bps, a.effective_from
+  from public.pocket_allocations a
+  join latest l on l.account_id = a.account_id and l.effective_from = a.effective_from
+  where a.space_id = p_space_id and a.weight_bps > 0;
+$$;
+comment on function public.pocket_allocations_on is 'Reparto de las cuentas entre bolsillos vigente en una fecha.';
 
 -- ---------------------------------------------------------------------------
 -- Reglas del usuario: datos sobre un catálogo cerrado (ADR-0017). Generan avisos de nivel 2.
@@ -351,6 +382,92 @@ grant update (template, scope, pocket_id, account_id, asset_id, metric, comparat
   on public.advice_rules to authenticated;
 
 -- ---------------------------------------------------------------------------
+-- Avisos: enlazados con la regla del usuario que los generó (se van con ella si se borra en cascada).
+-- La RPC es la única vía de alta y valida el nivel con las flags (doble barrera, ADR-0010).
+-- ---------------------------------------------------------------------------
+alter table public.recommendations add column advice_rule_id uuid,
+  add foreign key (advice_rule_id, space_id) references public.advice_rules (id, space_id) on delete cascade;
+comment on column public.recommendations.advice_rule_id is 'Regla del usuario que generó el aviso; nulo en los avisos del catálogo fijo.';
+create index recommendations_advice_rule_idx on public.recommendations (space_id, advice_rule_id) where advice_rule_id is not null;
+
+create function public.upsert_recommendation(
+  p_space_id uuid, p_rule_id text, p_rule_version integer, p_level smallint, p_severity text,
+  p_inputs_hash bytea, p_inputs_snapshot jsonb, p_assumptions_snapshot jsonb,
+  p_message_key text, p_message_params jsonb, p_confidence text, p_advice_rule_id uuid default null
+) returns uuid
+language plpgsql security definer set search_path = ''
+-- security definer: un miembro de solo lectura también dispara la evaluación; se comprueban permisos y flags.
+as $$
+declare
+  v_id uuid;
+begin
+  if not private.can_read(p_space_id) then
+    raise exception 'Sin acceso al espacio' using errcode = 'insufficient_privilege';
+  end if;
+  -- Doble barrera con el motor de reglas: el nivel debe estar activado para este espacio y país.
+  if p_level not between 1 and 2 or not public.feature_enabled('reco.level' || p_level::text, p_space_id) then
+    raise exception 'El nivel de aviso % no está activado para este espacio', p_level using errcode = 'insufficient_privilege';
+  end if;
+  insert into public.recommendations
+    (space_id, rule_id, rule_version, level, severity, inputs_hash, inputs_snapshot, assumptions_snapshot,
+     message_key, message_params, confidence, advice_rule_id)
+  values
+    (p_space_id, p_rule_id, p_rule_version, p_level, p_severity, p_inputs_hash,
+     coalesce(p_inputs_snapshot, '{}'::jsonb), coalesce(p_assumptions_snapshot, '{}'::jsonb),
+     p_message_key, coalesce(p_message_params, '{}'::jsonb), p_confidence, p_advice_rule_id)
+  on conflict (space_id, rule_id, inputs_hash) do update set updated_at = now()
+  returning id into v_id;
+  return v_id;
+end;
+$$;
+comment on function public.upsert_recommendation is 'Registra un aviso (idempotente por regla + hash de entradas). Rechaza niveles desactivados por flags. p_advice_rule_id enlaza la regla del usuario que lo generó (debe ser del mismo espacio: lo impone la FK compuesta).';
+revoke execute on function public.upsert_recommendation from public, anon;
+grant execute on function public.upsert_recommendation to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Consentimientos del usuario (RGPD art. 7): demostrables y revocables. Tabla del usuario, no del
+-- espacio (como profiles). Hoy solo un propósito: explicaciones con IA.
+-- ---------------------------------------------------------------------------
+create table public.user_consents (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  purpose text not null check (purpose in ('ai_explanations')),
+  policy_version smallint not null check (policy_version > 0),
+  granted_at timestamptz not null default now(),
+  withdrawn_at timestamptz,
+  check (withdrawn_at is null or withdrawn_at >= granted_at)
+);
+comment on table public.user_consents is 'Consentimientos dados y retirados, con la versión del texto aceptado. Un consentimiento vigente por usuario y propósito. [pii]';
+create unique index user_consents_active_idx on public.user_consents (user_id, purpose) where withdrawn_at is null;
+create index user_consents_user_idx on public.user_consents (user_id);
+alter table public.user_consents enable row level security;
+alter table public.user_consents force row level security;
+revoke all on public.user_consents from public, anon, authenticated;
+create policy user_consents_select on public.user_consents for select to authenticated
+using (user_id = (select auth.uid()));
+create policy user_consents_insert on public.user_consents for insert to authenticated
+with check (user_id = (select auth.uid()) and withdrawn_at is null);
+create policy user_consents_withdraw on public.user_consents for update to authenticated
+using (user_id = (select auth.uid()) and withdrawn_at is null)
+with check (user_id = (select auth.uid()) and withdrawn_at is not null);
+grant select on public.user_consents to authenticated;
+grant insert (user_id, purpose, policy_version) on public.user_consents to authenticated;
+grant update (withdrawn_at) on public.user_consents to authenticated;
+
+-- Única puerta para usar IA con los datos de un espacio: la flag del espacio/país Y el consentimiento
+-- vigente de quien la pide. La IA solo reformula avisos ya generados por reglas (ADR-0010): nunca
+-- genera recomendaciones ni nombra productos.
+create function public.ai_explanations_allowed(p_space_id uuid) returns boolean
+language sql stable set search_path = ''
+as $$
+  select public.feature_enabled('ai.explanations', p_space_id)
+     and exists (
+       select 1 from public.user_consents c
+       where c.user_id = (select auth.uid()) and c.purpose = 'ai_explanations' and c.withdrawn_at is null);
+$$;
+comment on function public.ai_explanations_allowed is 'true solo si la IA está activada para el espacio y el usuario actual tiene un consentimiento vigente.';
+
+-- ---------------------------------------------------------------------------
 -- Permisos de ejecución de las funciones nuevas
 -- ---------------------------------------------------------------------------
 revoke execute on all functions in schema private from public, anon, authenticated;
@@ -360,3 +477,5 @@ grant execute on function
   private.readable_space_ids(), private.peer_space_ids(), private.writable_space_ids(), private.owned_space_ids(),
   private.has_verified_mfa(), private.meets_sensitive_aal(), private.is_valid_isin(text)
 to authenticated;
+revoke execute on function public.pocket_allocations_on, public.ai_explanations_allowed from public, anon;
+grant execute on function public.pocket_allocations_on, public.ai_explanations_allowed to authenticated;

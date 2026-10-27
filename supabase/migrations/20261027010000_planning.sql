@@ -387,49 +387,14 @@ with check (
 );
 grant insert (recommendation_id, space_id, event, user_id) on public.recommendation_events to authenticated;
 
--- ---------------------------------------------------------------------------
--- RPC de avisos (security definer: un miembro de solo lectura también dispara la evaluación)
--- ---------------------------------------------------------------------------
-create function public.upsert_recommendation(
-  p_space_id uuid, p_rule_id text, p_rule_version integer, p_level smallint, p_severity text,
-  p_inputs_hash bytea, p_inputs_snapshot jsonb, p_assumptions_snapshot jsonb,
-  p_message_key text, p_message_params jsonb, p_confidence text
-) returns uuid
-language plpgsql security definer set search_path = ''
-as $$
-declare
-  v_id uuid;
-begin
-  if not private.can_read(p_space_id) then
-    raise exception 'Sin acceso al espacio' using errcode = 'insufficient_privilege';
-  end if;
-  -- Doble barrera con el motor de reglas: el nivel debe estar activado para este espacio y país.
-  if p_level not between 1 and 2 or not public.feature_enabled('reco.level' || p_level::text, p_space_id) then
-    raise exception 'El nivel de aviso % no está activado para este espacio', p_level using errcode = 'insufficient_privilege';
-  end if;
-  insert into public.recommendations
-    (space_id, rule_id, rule_version, level, severity, inputs_hash, inputs_snapshot, assumptions_snapshot,
-     message_key, message_params, confidence)
-  values
-    (p_space_id, p_rule_id, p_rule_version, p_level, p_severity, p_inputs_hash,
-     coalesce(p_inputs_snapshot, '{}'::jsonb), coalesce(p_assumptions_snapshot, '{}'::jsonb),
-     p_message_key, coalesce(p_message_params, '{}'::jsonb), p_confidence)
-  on conflict (space_id, rule_id, inputs_hash) do update set updated_at = now()
-  returning id into v_id;
-  return v_id;
-end;
-$$;
-comment on function public.upsert_recommendation is 'Registra un aviso (idempotente por regla + hash de entradas). Rechaza niveles desactivados por flags.';
 
 -- ---------------------------------------------------------------------------
 -- Permisos de ejecución
 -- ---------------------------------------------------------------------------
 revoke execute on all functions in schema private from public, anon, authenticated;
-revoke execute on function public.upsert_recommendation from public, anon;
 grant execute on function
   private.member_role(uuid), private.can_read(uuid), private.can_write(uuid), private.is_owner(uuid),
   private.space_ids_for_roles(public.app_role[]),
   private.readable_space_ids(), private.peer_space_ids(), private.writable_space_ids(), private.owned_space_ids(),
   private.has_verified_mfa(), private.meets_sensitive_aal(), private.is_valid_isin(text)
 to authenticated;
-grant execute on function public.upsert_recommendation to authenticated;

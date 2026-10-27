@@ -7,13 +7,15 @@ create table public.import_mappings (
   id uuid primary key default gen_random_uuid(),
   space_id uuid not null references public.spaces (id) on delete cascade,
   name text not null check (char_length(name) between 1 and 80),
-  institution_hint text check (char_length(institution_hint) <= 80),
+  institution_id uuid,
   mapping jsonb not null check (jsonb_typeof(mapping) = 'object' and pg_column_size(mapping) <= 16384),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (id, space_id),
-  unique (space_id, name)
+  unique (space_id, name),
+  foreign key (institution_id, space_id) references public.institutions (id, space_id) on delete set null (institution_id)
 );
+create index import_mappings_institution_idx on public.import_mappings (space_id, institution_id) where institution_id is not null;
 comment on column public.import_mappings.name is 'Nombre libre del mapeo. [pii]';
 comment on table public.import_mappings is 'Mapeo de columnas guardado por entidad (columnas, formato de fecha, separador decimal, signos).';
 

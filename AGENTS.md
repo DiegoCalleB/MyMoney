@@ -31,7 +31,7 @@ Con Docker disponible, `supabase test db` es la alternativa de mayor fidelidad p
 ## Reglas no negociables
 
 ### Seguridad
-1. **Toda tabla nueva** en `public` lleva `space_id` (salvo `profiles`), RLS activada **y forzada**, políticas por rol con los arrays de `private` (`readable_space_ids()`, `writable_space_ids()`…) y **sus tests pgTAP**. Sin tests no se fusiona.
+1. **Toda tabla nueva** en `public` lleva `space_id` (salvo las del propio usuario: `profiles` y `user_consents`, con RLS por `user_id`), RLS activada **y forzada**, políticas por rol con los arrays de `private` (`readable_space_ids()`, `writable_space_ids()`…) y **sus tests pgTAP**. Sin tests no se fusiona.
 2. **Integridad entre espacios**: toda clave foránea hacia otra tabla con `space_id` es **compuesta** `(xxx_id, space_id)`. El test `050-tenant-integrity` lo comprueba.
 3. La clave secreta de Supabase (o `service_role`) **nunca** se usa en `apps/web`: solo en `supabase/functions`. La web usa la clave publicable y el JWT del usuario.
 4. Funciones SQL: `set search_path = ''` y nombres cualificados; `security definer` solo con una justificación en un comentario y comprobación explícita de permisos.
