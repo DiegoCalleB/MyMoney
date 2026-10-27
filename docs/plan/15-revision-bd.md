@@ -82,7 +82,13 @@ Son medidas de un entorno de pruebas, no de producción: la instancia de Supabas
 
 - La auditoría detecta manipulaciones pero **no las impide a quien tenga control total de la base de datos**; el anclaje externo del último hash va en la fase 2.
 - Las validaciones diferidas se ejecutan por fila (~0,05 ms con estadísticas): suficiente para uso personal y familiar; si un espacio superara millones de patas habría que pasar a validación por lotes.
-- No se ha ejecutado `get_advisors` de Supabase sobre las tablas nuevas (aún no están aplicadas): hacerlo justo después de aplicar.
+- **Aplicada en staging el 27-10-2026** (proyecto `caoykbmwqxmuubfwoafh`, desde el editor SQL, en una transacción). `supabase/verify/001-security-checks.sql`: **0 filas**. Avisos de Supabase, todos revisados:
+  - *Seguridad, INFO* (`audit.events`, `private.app_settings` con RLS y sin políticas): intencionado, nadie accede.
+  - *Seguridad, WARN* (10 funciones `security definer` ejecutables por usuarios): son las RPC del diseño (crear espacio, movimientos, invitaciones, avisos…); cada una comprueba permisos de forma explícita.
+  - *Rendimiento, INFO, 49 «claves foráneas sin índice»*: falso positivo por el orden de columnas. El aviso exige `(account_id, space_id)`; los índices son `(space_id, account_id)` para que también sirvan a las consultas por espacio de la RLS. Comprobado con `EXPLAIN` (60.000 filas): la comprobación de la clave foránea usa el índice (0,04 ms).
+  - *Rendimiento, INFO, 95 «índices sin usar»*: esperado en una base de datos vacía; se revisa con uso real, no antes.
+  - *Rendimiento, INFO* (conexiones de Auth en valor absoluto): ajuste del proyecto, no del esquema.
+- Las migraciones se aplicaron desde el editor SQL, por lo que no figuran en la lista de migraciones de Supabase; al instalar la CLI se registran con `supabase migration repair`.
 - Los tests corren en Postgres 16 con una capa que imita Supabase; la comprobación contra el proyecto real se limita a las sentencias delicadas (sección 1) y al script de verificación posterior.
 - Sin revisión externa independiente todavía.
 
