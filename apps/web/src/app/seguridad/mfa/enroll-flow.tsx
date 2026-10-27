@@ -32,8 +32,6 @@ export function EnrollFlow() {
         </p>
       ) : null}
       <p className={styles.note}>{t("mfa.enroll.open_hint")}</p>
-      <p>{t("mfa.enroll.scan")}</p>
-      <img className={styles.qr} src={enroll.qr} alt={t("mfa.enroll.qr_alt")} />
       <p>{t("mfa.enroll.secret")}</p>
       <p>
         <code className={styles.secret}>{enroll.secret}</code>

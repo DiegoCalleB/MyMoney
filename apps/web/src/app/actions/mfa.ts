@@ -4,13 +4,12 @@ import { totpCodeInput } from "@mymoney/schemas";
 import { redirect } from "next/navigation";
 import { fieldErrorsFrom, formText, type FormState } from "@/components/form-state";
 import { logger } from "@/lib/logger";
-import { qrToDataUrl, safeOtpauthUri } from "@/lib/qr";
+import { safeOtpauthUri } from "@/lib/qr";
 import { getAuthState } from "@/server/auth";
 
 export interface EnrollState extends FormState {
   readonly enroll?: {
     readonly factorId: string;
-    readonly qr: string;
     readonly secret: string;
     /** Enlace para abrir la aplicación de autenticación con un toque, si es seguro. */
     readonly uri: string | null;
@@ -41,7 +40,6 @@ export async function startEnrollAction(): Promise<EnrollState> {
   return {
     enroll: {
       factorId: data.id,
-      qr: qrToDataUrl(data.totp.qr_code),
       secret: data.totp.secret,
       uri: safeOtpauthUri(data.totp.uri),
     },

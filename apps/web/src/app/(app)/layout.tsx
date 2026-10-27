@@ -1,10 +1,15 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { signOutAction } from "@/app/actions/auth";
+import { readMfaRequired } from "@/lib/env";
 import { t } from "@/lib/i18n";
+import { getAuthState } from "@/server/auth";
 import styles from "./shell.module.css";
 
-export default function AppLayout({ children }: { children: ReactNode }) {
+export default async function AppLayout({ children }: { children: ReactNode }) {
+  // Solo se ve cuando el segundo factor es opcional y la persona aún no lo ha activado.
+  const state = await getAuthState();
+  const mfaPending = state.kind === "enroll" && !readMfaRequired();
   return (
     <>
       <header className={styles.header}>
@@ -20,6 +25,11 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           </button>
         </form>
       </header>
+      {mfaPending ? (
+        <p className={styles.banner} role="note">
+          {t("mfa.banner")} <Link href="/seguridad/mfa">{t("mfa.banner.cta")}</Link>
+        </p>
+      ) : null}
       {children}
     </>
   );

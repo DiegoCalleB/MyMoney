@@ -25,6 +25,7 @@ Configuración del servicio web (`apps/web`) en Railway. Se hace en el panel: la
 | `NEXT_PUBLIC_SUPABASE_URL` | URL del proyecto de Supabase (pública) |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Clave publicable `sb_publishable_…` (pública). **Nunca la clave secreta**: la aplicación se niega a arrancar |
 | `APP_ORIGIN` | Dirección pública de la web, sin ruta, p. ej. `https://tu-servicio.up.railway.app` |
+| `MFA_REQUIRED` | Opcional. Por defecto el segundo factor es **obligatorio**. Con `false`, quien aún no lo haya activado puede entrar sin él (verá un aviso); quien ya lo tenga activado sigue teniendo que verificarlo. Pensado para uso con una sola persona; quítala o ponla en `true` para volver a exigirlo |
 | `LOG_PSEUDONYM_SECRET` | Aleatorio de 32 bytes o más (`openssl rand -base64 32`). Solo en Railway |
 
 Orden: primero «Generate Domain», luego `APP_ORIGIN` con esa dirección.

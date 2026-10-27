@@ -127,3 +127,20 @@ describe("APP_ORIGIN pegado con errores típicos", () => {
     expect(() => readAppOrigin({ APP_ORIGIN: "https://" })).toThrow();
   });
 });
+
+import { readMfaRequired } from "@/lib/env";
+
+describe("readMfaRequired", () => {
+  it("es obligatorio por defecto", () => {
+    expect(readMfaRequired({})).toBe(true);
+    expect(readMfaRequired({ MFA_REQUIRED: "true" })).toBe(true);
+    expect(readMfaRequired({ MFA_REQUIRED: "" })).toBe(true);
+    expect(readMfaRequired({ MFA_REQUIRED: "cualquier cosa" })).toBe(true);
+  });
+  it("solo se desactiva con false, 0 o no, ignorando mayúsculas y espacios", () => {
+    expect(readMfaRequired({ MFA_REQUIRED: "false" })).toBe(false);
+    expect(readMfaRequired({ MFA_REQUIRED: " FALSE " })).toBe(false);
+    expect(readMfaRequired({ MFA_REQUIRED: "0" })).toBe(false);
+    expect(readMfaRequired({ MFA_REQUIRED: "No" })).toBe(false);
+  });
+});

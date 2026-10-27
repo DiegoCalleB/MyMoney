@@ -70,3 +70,14 @@ export function readAppOrigin(source: Record<string, string | undefined> = proce
   }
   return url.origin;
 }
+
+/**
+ * ¿Es obligatorio el segundo factor? Sí, salvo que `MFA_REQUIRED` valga `false`, `0` o `no`.
+ * Es un interruptor deliberado y reversible para uso con una sola persona: quien ya tenga un
+ * factor activado sigue teniendo que verificarlo; solo se deja entrar sin él a quien aún no
+ * lo ha activado.
+ */
+export function readMfaRequired(source: Record<string, string | undefined> = process.env): boolean {
+  const value = source.MFA_REQUIRED?.trim().toLowerCase();
+  return !(value === "false" || value === "0" || value === "no");
+}
