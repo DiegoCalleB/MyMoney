@@ -2,6 +2,8 @@
 
 Aquí vive el conocimiento de dominio (fiscalidad, regulación, protección de datos, metodología) que usa la aplicación. Es la **fuente de verdad en el repositorio**: los cuadernos externos (NotebookLM u otros) solo sirven para investigar; nada cuenta hasta que está aquí, con cita y fecha.
 
+Inventario de las fuentes del cuaderno de investigación, clasificadas por fiabilidad: [fuentes-cuaderno.md](fuentes-cuaderno.md).
+
 ## Reglas
 
 1. **Una ficha por tema**, en un archivo `NN-tema.md` con la plantilla [`_plantilla.md`](_plantilla.md).
