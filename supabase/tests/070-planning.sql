@@ -1,6 +1,6 @@
 -- Planificación: invariantes de sumas, avisos (nivel 3 prohibido), eventos, ISIN, perfil y permisos.
 begin;
-select plan(45);
+select plan(49);
 
 select tests.create_user('alicia@example.test') as alicia \gset
 select tests.create_user('vic@example.test') as vic \gset
@@ -33,6 +33,18 @@ select throws_ok(
 select lives_ok(
   format($$insert into public.loan_terms (account_id, space_id, principal_minor, rate_type, annual_rate, term_months, start_on) values (%L, %L, 100000, 'fixed', 0.03, 300, '2026-01-01')$$, :'mort', :'sp'),
   'y sí de una hipoteca');
+select lives_ok(format($$insert into public.loan_rate_periods (account_id, space_id, effective_from, annual_rate, index_value, source) values (%L, %L, '2027-01-01', 0.0315, 0.0236, 'Carta de revisión')$$, :'mort', :'sp'),
+  'una hipoteca guarda cada revisión de su tipo');
+select throws_ok(format($$insert into public.loan_rate_periods (account_id, space_id, effective_from, annual_rate) values (%L, %L, '2027-01-01', 0.01)$$, :'acc', :'sp'),
+  '23514', null, 'una cuenta que no es deuda no tiene tipo de préstamo');
+
+-- Parámetros fiscales: lectura para usuarios, escritura solo del servidor
+select tests.as_postgres();
+insert into ref.tax_parameters (country, fiscal_year, key, value, source_url, verified_on) values ('ES', 2026, 'pension.contribution_limit_minor', '"150000"', 'https://www.boe.es/', '2026-10-27');
+select tests.authenticate_as(:'alicia');
+select is((select count(*)::int from public.tax_parameters where country = 'ES'), 1, 'un usuario lee los parámetros fiscales con su fuente');
+select throws_ok($$insert into public.tax_parameters (country, fiscal_year, key, value, source_url, verified_on) values ('ES', 2026, 'x', '1', 'https://x', '2026-01-01')$$,
+  '42501', null, 'pero no los modifica');
 
 -- Titularidad: suma exacta de 10000 pb
 select lives_ok(format($q$do $b$ begin

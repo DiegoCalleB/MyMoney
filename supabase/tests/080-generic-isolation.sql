@@ -53,6 +53,7 @@ begin
   insert into public.accounts (space_id, name, kind, currency) values (p_space, 'A2', 'brokerage', 'EUR') returning id into a2;
   insert into public.accounts (space_id, name, kind, currency) values (p_space, 'A3', 'mortgage', 'EUR') returning id into a3;
   insert into public.account_holders values (a1, p1, p_space, 'holder', 10000);
+  insert into public.loan_rate_periods (account_id, space_id, effective_from, annual_rate) values (a3, p_space, '2026-01-01', 0.03);
   insert into public.loan_terms (account_id, space_id, principal_minor, rate_type, annual_rate, term_months, start_on)
     values (a3, p_space, 1000, 'fixed', 0.03, 300, '2026-01-01');
   insert into public.assets (space_id, kind, name, currency, asset_class) values (p_space, 'etf', 'ETF', 'EUR', 'equity') returning id into ast;

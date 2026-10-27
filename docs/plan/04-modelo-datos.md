@@ -59,7 +59,6 @@ erDiagram
   spaces ||--o{ import_batches : ""
   import_batches ||--o{ import_rows : ""
   import_rows ||--o| transactions : "genera"
-  spaces ||--o{ space_modules : ""
 ```
 
 ## Tablas
@@ -224,6 +223,7 @@ Ejemplos:
 | Tabla | Columnas principales |
 |-------|----------------------|
 | `pockets` | `kind` (`emergency`, `home`, `long_term`, `retirement`, `speculative`, `children`, `custom`), `name`, `target_minor`/`currency`/`target_on` (opcionales), `risk_level`, `horizon_years`, `person_id null`, `params jsonb` (supuestos del bolsillo, Zod) |
+| `loan_rate_periods` | `account_id`, `effective_from`, `annual_rate`, `index_value`, `source`: historial de revisiones del tipo de un préstamo |
 | `pocket_allocations` | `pocket_id`, `account_id`, `asset_id null`, `effective_from`, `weight_bps` (por conjunto: suma ≤ 10000 por destino; cuenta entera o por posiciones). Historial completo: `pocket_allocations_on(espacio, fecha)` da el vigente (ADR-0019) |
 | `institutions` | `name` (único), `kind`, `country_code` (ADR-0019) |
 | `user_consents` | `user_id`, `purpose` (`ai_explanations`), `policy_version`, `granted_at`, `withdrawn_at`; RLS por usuario |
@@ -252,7 +252,7 @@ Huella de fila: `SHA-256(account_id ‖ occurred_on ‖ amount_minor ‖ currenc
 
 | Tabla | Notas |
 |-------|-------|
-| `space_modules` | (`space_id`, `module_key`, `enabled`). Módulos futuros con sus propias tablas prefijadas (`learn_*`, `mkt_*`) y las mismas reglas RLS |
+| Módulos futuros | Sin tabla en el MVP: se activan con *feature flags* por espacio (`ref.feature_flags`); si llegan, con sus propias tablas prefijadas (`learn_*`, `mkt_*`) y las mismas reglas RLS |
 | `audit.events` | `id bigint identity`, `occurred_at`, `actor_hash bytea`, `space_id`, `action`, `entity`, `entity_id`, `metadata jsonb` (sin PII ni importes), `ip_prefix_hash bytea`, `prev_hash bytea`, `hash bytea`. Ver ADR-0009 |
 | `private.data_requests` | `user_id`, `kind` (`export`, `deletion`), `status`, `requested_at`, `completed_at` |
 
@@ -318,11 +318,10 @@ Leyenda: **S** select, **I** insert, **U** update, **D** delete. "—" denegado.
 | `recommendations` | S U(estado) | S U(estado) | S | S | Inserción solo por el servidor mediante RPC que valida el nivel con *flags* |
 | `recommendation_events` | S I | S I | S I | S I | Solo inserción; sin U/D |
 | `import_*` | S I U D | S I U D | S | — | El asesor no ve archivos importados |
-| `space_modules` | S U | S | S | — | |
 | `ref.*` | S | S | S | S | Escritura solo con el rol de tareas |
 | `audit.events` | S (de su espacio, mediante vista) | — | — | — | Sin U/D para nadie, ni siquiera el propietario de la tabla de la aplicación |
 | Storage `imports` | S I D en `space_id/…` | S I D | — | — | *Bucket* privado; URL firmada de corta duración |
-| Storage `exports` | S (propias, AAL2) | — | — | — | Borrado automático a las 24 h |
+| Exportación (RGPD) | Descarga directa generada al momento (AAL2) | — | — | — | No se guarda ningún archivo de exportación |
 
 **Pruebas pgTAP obligatorias por tabla** (generadas con una plantilla):
 1. RLS activada y forzada (`relrowsecurity` y `relforcerowsecurity`).

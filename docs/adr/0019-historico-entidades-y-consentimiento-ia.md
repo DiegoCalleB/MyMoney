@@ -12,6 +12,10 @@ Segunda revisión antes de la primera migración remota, con los objetivos del p
 3. **Avisos enlazados con su regla.** `recommendations.advice_rule_id` (FK compuesta) identifica la regla del usuario que generó cada aviso. `upsert_recommendation` se define una sola vez, con ese parámetro opcional.
 4. **IA con consentimiento demostrable.** `user_consents` (tabla del usuario, con RLS por `user_id`): consentimiento por propósito con la versión del texto aceptado, revocable y con historial. `public.ai_explanations_allowed(espacio)` es la única puerta: exige la flag `ai.explanations` y un consentimiento vigente. La IA solo reformula avisos ya generados por reglas; nunca genera recomendaciones ni nombra productos (regla 20 y ADR-0010).
 
+5. **Historial del tipo de los préstamos** (`loan_rate_periods`): cada revisión de una hipoteca variable o mixta, con el índice aplicado y su fuente.
+6. **Parámetros legales con fuente** (`ref.tax_parameters`): límites y tramos por país y ejercicio, con URL oficial y fecha de verificación; lectura para usuarios, escritura solo del servidor. Ninguna cifra legal en el código.
+7. **Sin piezas fantasma en el plan:** los módulos futuros se activan con *flags* (sin tabla `space_modules`) y la exportación RGPD se descarga al momento (sin almacén de exportaciones).
+
 ## Qué ya tenía historial (sin cambios)
 Movimientos (fecha contable), valoraciones por cuenta y posición, tipos de cambio por fecha (BCE), IPC mensual por país (INE), fichas y composiciones de producto, tramos de remuneración, supuestos y presupuestos con vigencia, revisiones de reglas.
 

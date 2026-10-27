@@ -167,6 +167,24 @@ create table public.loan_terms (
 comment on table public.loan_terms is 'Condiciones de préstamos e hipotecas (1:1 con cuentas de deuda). [financiero]';
 create index loan_terms_space_idx on public.loan_terms (space_id, account_id);
 
+-- Historial del tipo de un préstamo (revisiones de una hipoteca variable o mixta). loan_terms guarda
+-- las condiciones iniciales; el tipo vigente en una fecha es el del periodo con mayor effective_from.
+create table public.loan_rate_periods (
+  account_id uuid not null,
+  space_id uuid not null references public.spaces (id) on delete cascade,
+  effective_from date not null,
+  annual_rate numeric(9, 6) not null check (annual_rate between 0 and 1),
+  index_value numeric(9, 6),
+  source text check (char_length(source) between 1 and 200),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (account_id, effective_from),
+  foreign key (account_id, space_id) references public.accounts (id, space_id) on delete cascade
+);
+comment on table public.loan_rate_periods is 'Tipo anual de un préstamo desde cada revisión (p. ej., euríbor + diferencial). Permite recalcular cuotas e intereses pasados. [financiero]';
+comment on column public.loan_rate_periods.index_value is 'Valor del índice de referencia aplicado en la revisión, si lo hay.';
+create index loan_rate_periods_space_idx on public.loan_rate_periods (space_id, account_id, effective_from desc);
+
 -- ---------------------------------------------------------------------------
 -- Activos
 -- ---------------------------------------------------------------------------
@@ -337,6 +355,31 @@ create table ref.inflation_index (
   primary key (country, period)
 );
 comment on table ref.inflation_index is 'Índice de precios al consumo por país y mes (primer día). Fuente: INE para España.';
+
+-- Parámetros legales y fiscales por país y ejercicio (límites de aportación, tramos, mínimos…).
+-- Ninguna cifra legal vive en el código: sale de aquí, siempre con su fuente y fecha de verificación.
+create table ref.tax_parameters (
+  country char(2) not null check (country ~ '^[A-Z]{2}$'),
+  fiscal_year smallint not null check (fiscal_year between 2000 and 2100),
+  key text not null check (key ~ '^[a-z0-9_.]{1,80}$'),
+  value jsonb not null check (pg_column_size(value) <= 8192),
+  source_url text not null check (source_url ~ '^https://' and char_length(source_url) <= 500),
+  verified_on date not null,
+  note text check (char_length(note) <= 300),
+  primary key (country, fiscal_year, key)
+);
+comment on table ref.tax_parameters is 'Parámetros legales por país y ejercicio con fuente oficial (BOE, AEAT) y fecha de verificación. Los cálculos fiscales son informativos y dicen de qué ejercicio y fuente sale cada cifra.';
+
+alter table ref.tax_parameters enable row level security;
+alter table ref.tax_parameters force row level security;
+create policy tax_parameters_read on ref.tax_parameters for select to authenticated using (true);
+revoke all on ref.tax_parameters from public, anon, authenticated;
+grant select on ref.tax_parameters to authenticated;
+grant select, insert, update, delete on ref.tax_parameters to service_role;
+create view public.tax_parameters with (security_invoker = true) as
+  select country, fiscal_year, key, value, source_url, verified_on, note from ref.tax_parameters;
+revoke all on public.tax_parameters from public, anon, authenticated;
+grant select on public.tax_parameters to authenticated;
 
 alter table ref.fx_rates enable row level security;
 alter table ref.fx_rates force row level security;
@@ -513,6 +556,8 @@ end;
 $$;
 create trigger loan_terms_guard before insert or update on public.loan_terms
   for each row execute function private.guard_loan_terms();
+create trigger loan_rate_periods_guard before insert or update on public.loan_rate_periods
+  for each row execute function private.guard_loan_terms();
 
 -- Categorías: dos niveles como máximo y el hijo hereda el tipo del padre.
 create function private.guard_category() returns trigger
@@ -568,6 +613,7 @@ begin
   perform private.secure_space_table('accounts');
   perform private.secure_space_table('account_holders');
   perform private.secure_space_table('loan_terms');
+  perform private.secure_space_table('loan_rate_periods');
   perform private.secure_space_table('assets');
   perform private.secure_space_table('categories');
   perform private.secure_space_table('valuations');
