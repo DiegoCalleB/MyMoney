@@ -24,6 +24,8 @@ pnpm agents:check           # falla si las réplicas no están sincronizadas (CI
 
 Con Docker disponible, `supabase test db` es la alternativa de mayor fidelidad para los tests de base de datos.
 
+Opcional: **Graphify** (mapa de conocimiento del repositorio para agentes). Instalación fijada: `uv tool install graphifyy==0.9.90` (paquete con doble *y*; los demás `graphify*` de PyPI no son este proyecto) y `graphify install`; luego `/graphify .`. Respeta `.gitignore` y `.graphifyignore`, que excluyen `privado/`: **nunca** lo ejecutes sobre otra carpeta ni quites esas exclusiones. La salida (`graphify-out/`) no se versiona.
+
 ## Arquitectura en una línea
 
 `apps/web` (Next.js App Router, TypeScript estricto) → Supabase (Postgres + RLS, Auth, Storage) en la UE. Toda la lógica financiera vive en `packages/finance-core` (pura) y la validación en `packages/schemas` (Zod).

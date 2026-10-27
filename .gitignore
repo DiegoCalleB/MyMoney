@@ -21,3 +21,6 @@ privado/
 
 # Generado por scripts/concat-migrations.sh
 supabase/dist/
+
+# Grafo de conocimiento generado por Graphify (se regenera; no se versiona)
+graphify-out/

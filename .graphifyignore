@@ -1,0 +1,9 @@
+# Graphify no debe leer nunca datos reales ni artefactos generados.
+# (También respeta .gitignore; esto es una segunda barrera explícita.)
+privado/
+.env*
+supabase/dist/
+supabase/.temp/
+graphify-out/
+node_modules/
+coverage/
