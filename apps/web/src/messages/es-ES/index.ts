@@ -103,6 +103,58 @@ export const esES = {
   "home.by_pocket": "Por bolsillo",
   "home.unassigned": "Sin asignar a un bolsillo",
   "home.accounts": "Tus cuentas",
+  "returns.title": "Rentabilidad",
+  "returns.intro":
+    "Lo que has aportado frente a lo que valen hoy tus cuentas. Solo aparecen las cuentas con aportaciones apuntadas.",
+  "returns.contributed": "Aportado",
+  "returns.value": "Valor hoy",
+  "returns.gain": "Ganancia",
+  "returns.simple": "Rentabilidad total",
+  "returns.annualized": "Anualizada (estimada)",
+  "returns.since": "Desde {date}",
+  "returns.total": "Total de las cuentas con aportaciones",
+  "returns.explain.summary": "¿Cómo se calcula?",
+  "returns.explain.body":
+    "Ganancia = valor de hoy − lo aportado (+ lo retirado). La rentabilidad total es la ganancia entre lo aportado. La anualizada tiene en cuenta cuándo pusiste cada aportación (método XIRR) y solo se muestra con al menos un año de datos. Es una estimación y la rentabilidad pasada no garantiza la futura.",
+  "returns.caveat.short_period":
+    "Con menos de un año de datos no se calcula la rentabilidad anualizada.",
+  "returns.caveat.single_flow_date":
+    "Todo lo aportado figura en una sola fecha: si lo fuiste aportando poco a poco, la anualizada es solo aproximada. Apunta tus aportaciones con su fecha para afinarla.",
+  "returns.caveat.multiple_roots":
+    "Con tantos movimientos de entrada y salida, la anualizada no es fiable y no se muestra.",
+  "returns.caveat.no_solution": "No se ha podido calcular una rentabilidad anualizada razonable.",
+  "returns.caveat.no_positive_contribution":
+    "Sin aportaciones netas positivas no hay rentabilidad total.",
+  "returns.empty":
+    "Apunta aportaciones a tus cuentas de inversión (en «Apuntar movimiento», tipo aportación) y aquí verás cuánto has ganado.",
+  "advice.concentration_institution":
+    "Una sola entidad concentra el {share} de tu patrimonio (tu umbral de aviso es el {limit}). Repartir el dinero entre varias entidades puede reducir la dependencia de una sola; la decisión es tuya.",
+  "advice.liquid_share":
+    "El {share} de tu patrimonio está en efectivo o cuentas de ahorro (tu umbral de información es el {limit}). Puede ser útil tener claro qué parte necesitas a corto plazo y qué parte tiene un horizonte más largo.",
+  "advice.runway_low":
+    "Tu efectivo y tus cuentas de ahorro cubren unos {months} meses de gastos, con los {expense} al mes que indicaste. Tu umbral de aviso es de {limit} meses.",
+  "advice.runway_high":
+    "Tu efectivo y tus cuentas de ahorro cubren unos {months} meses de gastos, con los {expense} al mes que indicaste, por encima de tu umbral de {limit} meses. Puede ser un buen momento para revisar qué parte necesitas a corto plazo.",
+  "advice.stale_valuations":
+    "{count} cuentas tienen un valor de hace más de 31 días, así que las cifras y los avisos pueden no reflejar tu situación. Actualiza sus valores.",
+  "advice.why.summary": "¿Por qué me sale este aviso?",
+  "advice.why.body":
+    "Se calcula solo con los datos que has introducido y con umbrales que puedes cambiar. No conoce el resto de tu situación personal.",
+  "advice.why.confidence_low": "Confianza baja: algún valor está desactualizado.",
+  "advice.why.confidence_medium": "Confianza media: usa un dato que tú estimaste.",
+  "advice.why.confidence_high": "Confianza alta: usa datos al día.",
+  "advice.limits":
+    "Los avisos informan de hechos sobre tus propios datos. No son asesoramiento financiero ni una recomendación personalizada: la decisión es siempre tuya.",
+  "advice.expense_cta": "Indica tu gasto mensual para ver cuántos meses cubre tu colchón",
+  "assumptions.title": "Tus supuestos",
+  "assumptions.intro":
+    "Los avisos usan estos datos. Son aproximaciones tuyas y puedes cambiarlos cuando quieras.",
+  "assumptions.expense.label": "Gasto mensual aproximado",
+  "assumptions.expense.hint": "Lo que gastas al mes de media, en {currency}. Por ejemplo 1.500.",
+  "assumptions.submit": "Guardar",
+  "assumptions.failed": "No hemos podido guardar el supuesto. Inténtalo de nuevo.",
+  "assumptions.expense_invalid": "No entendemos el importe. Escríbelo como 1.500,00.",
+  "assumptions.expense_not_positive": "El gasto mensual debe ser mayor que cero.",
   "home.group.count": "{count} cuentas",
   "home.charts.title": "Tu cartera en gráficos",
   "home.charts.by_kind": "Por tipo de activo",
@@ -139,7 +191,7 @@ export const esES = {
   "fx.rate_not_found": "falta el tipo de cambio",
 
   "validation.date_invalid": "Escribe una fecha válida.",
-  "movement.kind_invalid": "Elige si es un gasto, un ingreso o un traspaso.",
+  "movement.kind_invalid": "Elige qué tipo de movimiento es.",
   "movement.to_account_required": "Elige la cuenta de destino.",
   "movement.same_account": "El origen y el destino deben ser cuentas distintas.",
   "movement.description_too_long": "La descripción puede tener como máximo 200 caracteres.",
@@ -149,6 +201,8 @@ export const esES = {
   "movement.kind.expense": "Un gasto",
   "movement.kind.income": "Un ingreso",
   "movement.kind.transfer": "Un traspaso entre mis cuentas",
+  "movement.kind.contribution": "Una aportación (dinero que pongo en una cuenta)",
+  "movement.kind.withdrawal": "Una retirada (dinero que saco de una cuenta)",
   "movement.account.label": "Cuenta",
   "movement.account.from": "Cuenta de origen",
   "movement.account.to": "Cuenta de destino",
