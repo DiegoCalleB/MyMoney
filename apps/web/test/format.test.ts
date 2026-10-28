@@ -6,9 +6,9 @@ const plain = (s: string) => s.replace(/\s/g, " ");
 
 describe("formatMoney", () => {
   it("formatea en español con la moneda y sus decimales", () => {
-    expect(plain(formatMoney(money(123456n, "EUR")))).toBe("1234,56 €");
+    expect(plain(formatMoney(money(123456n, "EUR")))).toBe("1.234,56 €");
     expect(plain(formatMoney(money(123456789n, "EUR")))).toBe("1.234.567,89 €");
-    expect(plain(formatMoney(money(1234n, "JPY")))).toBe("1234 JPY");
+    expect(plain(formatMoney(money(1234n, "JPY")))).toBe("1.234 JPY");
     expect(plain(formatMoney(money(5n, "EUR")))).toBe("0,05 €");
   });
 

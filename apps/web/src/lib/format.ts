@@ -9,6 +9,8 @@ const LOCALE = "es-ES";
 export function formatMoney(amount: Money): string {
   return new Intl.NumberFormat(LOCALE, {
     style: "currency",
+    // Agrupa también los miles de cuatro cifras: en listas de importes se lee mejor alineado.
+    useGrouping: "always",
     currency: amount.currency,
     minimumFractionDigits: MINOR_UNITS[amount.currency],
     maximumFractionDigits: MINOR_UNITS[amount.currency],
