@@ -304,6 +304,9 @@ export default async function HomePage({ params }: { params: Promise<{ spaceId: 
           <Link className={styles.secondary} href={`/s/${spaceId}/movimientos/nuevo`}>
             {t("movement.new.link")}
           </Link>
+          <Link className={styles.secondary} href={`/s/${spaceId}/conexiones`}>
+            {t("connections.link")}
+          </Link>
           <Link className={styles.secondary} href={`/s/${spaceId}/referencia`}>
             {t("benchmark.link")}
           </Link>

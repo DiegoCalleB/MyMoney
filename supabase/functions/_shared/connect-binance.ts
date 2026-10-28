@@ -62,7 +62,8 @@ export async function handleConnectBinance(
   }
 
   // Con el JWT de la persona (RLS): ¿puede gestionar esta conexión, con el segundo factor al día?
-  const allowed = await userRpc<boolean>(config, deps.fetchFn, jwt, "can_manage_connection", {
+  const publishableKey = request.headers.get("apikey") ?? config.publishableKey;
+  const allowed = await userRpc<boolean>({ ...config, publishableKey }, deps.fetchFn, jwt, "can_manage_connection", {
     p_connection_id: connectionId,
   });
   if (!allowed.ok || allowed.data !== true) return json(403, { error: "forbidden" });

@@ -67,3 +67,37 @@ Una Edge Function (`supabase/functions/update-prices`) guarda en `ref.prices` el
 5. Comprobar con una llamada manual: la respuesta solo lleva contadores (`updated`, `rejected`, `symbols`).
 
 Los límites de Binance son por IP, no por usuario: una petición cada 6 horas, con hasta 100 símbolos, queda muy por debajo.
+
+## Conexiones automáticas (Binance) — opcional
+
+Lo construido sigue el [ADR-0022](adr/0022-conexiones-automaticas.md) y el capítulo 16 del plan. **Nada de esto se hace solo: cada paso lo aplica la persona propietaria** (regla 12; primero en un proyecto de pruebas). Hasta que no se haga, la pantalla «Conexiones automáticas» de la web no encuentra las tablas y no debe enseñarse.
+
+1. **Migraciones** (en este orden): `20261029000000_import_commit_kinds.sql`, `20261029010000_price_feed.sql`, `20261029020000_income_events.sql` y `20261029030000_connections.sql`. Todas son aditivas. Antes: `pnpm test:db` en verde.
+2. **Clave maestra de la bóveda** (la que cifra las credenciales; **no la guardes en la base de datos ni en el repositorio**). Genera una de 32 bytes: `openssl rand -base64 32`. Guárdala en tu gestor de contraseñas **y** como secreto de las dos funciones:
+   - `VAULT_KEK_V1` = el valor generado, `VAULT_KEK_CURRENT` = `1`.
+   - Si la pierdes, las conexiones no se pueden descifrar y hay que volver a conectarlas (no se pierden datos ya importados).
+   - Para rotarla: añade `VAULT_KEK_V2`, cambia `VAULT_KEK_CURRENT` a `2` y conserva la `V1` hasta volver a cifrar.
+3. **Secretos de las funciones** (`supabase secrets set`): `SYNC_WORKER_SECRET` (aleatorio, 32 bytes o más). Opcionales: `SYNC_QUOTE` (`EUR`), `SYNC_MAX_JOBS` (`5`), `BINANCE_API_BASE`. `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` los pone Supabase; la clave secreta no sale de las funciones.
+4. **Desplegar**: `supabase functions deploy connect-binance` y `supabase functions deploy sync-worker`.
+5. **Programar con `pg_cron` y `pg_net`**, con los secretos en Vault (no en el SQL):
+
+   ```sql
+   -- Reparte la sincronización diaria de cada conexión (cada 5 minutos).
+   select cron.schedule('schedule-syncs', '*/5 * * * *', $$ select public.schedule_due_syncs(); $$);
+
+   -- Procesa la cola (cada minuto).
+   select cron.schedule('sync-worker', '* * * * *', $$
+     select net.http_post(
+       url := (select decrypted_secret from vault.decrypted_secrets where name = 'project_url') || '/functions/v1/sync-worker',
+       headers := jsonb_build_object(
+         'Content-Type', 'application/json',
+         'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'publishable_key'),
+         'x-cron-secret', (select decrypted_secret from vault.decrypted_secrets where name = 'sync_worker_secret')),
+       body := '{}'::jsonb);
+   $$);
+   ```
+
+6. **IP fija (opcional, recomendado en el SaaS).** Binance permite restringir una clave a direcciones IP, pero las Edge Functions de Supabase no tienen IP de salida fija. Para una sola persona basta sin restricción de IP, con la clave de solo lectura (Binance puede desactivar claves sin IP tras un periodo sin usar [A VERIFICAR]; la sincronización diaria la mantiene en uso). Para el SaaS: un proxy de salida con IP fija o el trabajador en Railway (ADR-0022, punto 7, que exige cambiar la regla 3 de `AGENTS.md`).
+7. **Límites.** Una sincronización diaria por conexión, «Sincronizar ahora» limitado a una cada 15 minutos, y un cubo de fichas global por proveedor (la mitad del peso por minuto publicado por Binance [A VERIFICAR la cifra]).
+
+**Qué no está probado contra el servicio real.** Los nombres de campo de la API de Binance salen de su documentación pública y se validan de forma estricta con datos inventados [A VERIFICAR contra la API real]. Primera prueba real: conecta con una clave de solo lectura, pulsa «Sincronizar ahora» y comprueba el saldo y los depósitos de los últimos 89 días.

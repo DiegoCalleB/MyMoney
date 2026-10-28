@@ -19,6 +19,11 @@ La persona propietaria quiere conectar sus entidades automáticamente y que el d
 6. **Binance con clave Ed25519 autogenerada**: el servidor genera el par y el usuario solo registra la clave pública. Se rechazan las claves con permiso de operar o retirar.
 7. **Worker**: Edge Function en uso propio. Al abrir a otras personas, `apps/worker` en Railway con IP de salida fija y un rol de base de datos propio sin la clave secreta. **Esto exige modificar la regla 3 de `AGENTS.md` cuando se acepte esta parte**; hasta entonces sigue vigente tal cual.
 
+## Estado de la implementación (2026-10-29)
+- **Hecho y probado** (pgTAP, Vitest, cobertura 100 % en las funciones): tablas `connections` y `connection_accounts` con RLS y claves compuestas; bóveda con cifrado de sobre (AES-256-GCM, AAD por fila, clave maestra con versión fuera de la base de datos); cola con `SKIP LOCKED`, cubo de fichas, reintentos con retroceso; `ingest_sync` como única vía de escritura; Edge Functions `connect-binance` (dos pasos, clave Ed25519 generada en el servidor, rechazo y revocación de claves con permisos de más) y `sync-worker`; pantallas de la web. Conectar o revocar exige AAL2 si hay MFA (`can_manage_connection`).
+- **Pendiente** (necesita datos o decisiones de la persona propietaria): contraste de los nombres de campo de Binance con la API real; PSD2 con Enable Banking (sandbox, contrato, EIPD y dictamen); eToro (lector `.xlsx` o API); el trabajador en Railway y el cambio de la regla 3.
+- La regla 3 de `AGENTS.md` **no se ha cambiado**: la clave secreta solo se usa en `supabase/functions`.
+
 ## Alternativas consideradas
 - **GoCardless**: cerrado a altas nuevas.
 - **TrueLayer, Tink, Salt Edge**: sin opción gratuita para uso propio conocida; se pedirá oferta si Enable Banking no cubre alguna entidad.

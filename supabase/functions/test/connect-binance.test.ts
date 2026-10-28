@@ -81,6 +81,19 @@ describe("handleConnectBinance: entrada", () => {
     expect((await handleConnectBinance(request({ action: "start", connection_id: CONNECTION_ID }), config, failing.deps)).status).toBe(403);
   });
 
+  it("usa la clave publicable que envía la web si viene en la cabecera", async () => {
+    const { deps, calls } = await setup({ "rpc:can_manage_connection": () => reply(200, false) });
+    await handleConnectBinance(
+      request(
+        { action: "start", connection_id: CONNECTION_ID },
+        { authorization: "Bearer jwt-de-prueba", apikey: "publicable-de-la-web" },
+      ),
+      config,
+      deps,
+    );
+    expect(calls[0]?.headers.apikey).toBe("publicable-de-la-web");
+  });
+
   it("la conexión debe existir, ser de Binance y estar pendiente", async () => {
     const other = await setup({}, "pending", "etoro");
     expect((await handleConnectBinance(request({ action: "start", connection_id: CONNECTION_ID }), config, other.deps)).status).toBe(404);
