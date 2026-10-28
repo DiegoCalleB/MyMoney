@@ -134,6 +134,14 @@ Tres funciones de `finance-core`, con ejemplos, propiedades y cobertura total. T
 
 Propiedades añadidas: clasificado + sin clasificar = total; ningún cubo es negativo; el orden de entrada no cambia el resultado; el total del último año suma exactamente los cobros de esos 365 días; cada mes es dividendos + intereses; con precio constante la referencia vale lo aportado (± 1 unidad mínima); escalar los flujos por k escala la referencia (± k unidades mínimas).
 
+### Fiscalidad informativa implementada (octubre de 2026)
+
+`savingsTax`, `pensionRoom` y `transferVsSale` (`finance-core/src/tax.ts`), sin ninguna cifra legal en el código: escala y límite llegan como parámetros con `ParameterSource` (ejercicio, URL y fecha de verificación) desde `ref.tax_parameters`, y la explicación los repite.
+- **`savingsTax`**: escala progresiva por tramos; una pérdida no paga (la compensación no se modela y se dice); redondeo al céntimo por tramo. Propiedades: la cuota no es negativa ni supera el tipo máximo; las bases de los tramos suman la ganancia positiva; es monótona.
+- **`pensionRoom`**: límite − aportado del ejercicio (solo entradas); informa del exceso. No separa sublímites (aportaciones de la empresa) y lo avisa.
+- **`transferVsSale`**: con datos escritos por la persona (comisiones actual y de destino), compara traspaso (sin impuesto ahora) y venta (impuesto sobre la ganancia a nivel de cuenta). El ahorro anual es *diferencia de comisión × dinero que cambia de producto*, no una resta de comisiones absolutas (que sería engañosa al quedar menos capital tras pagar el impuesto): una propiedad lo detectó. Años para compensar = impuesto / ahorro anual, o «no compensa». Supuestos visibles: comisiones constantes, sin rentabilidad, ganancia a nivel de cuenta, traspaso sin tributación inmediata [A VERIFICAR], sin regla de recompra.
+- No implementado: `foreignAssetsThreshold` (modelos 720/721, necesita país por cuenta) ni lotes FIFO (HU-33).
+
 ## Estrategia de tests
 
 | Tipo | Herramienta | Qué cubre | Umbral |

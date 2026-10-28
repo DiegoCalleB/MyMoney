@@ -101,3 +101,26 @@ Lo construido sigue el [ADR-0022](adr/0022-conexiones-automaticas.md) y el capí
 7. **Límites.** Una sincronización diaria por conexión, «Sincronizar ahora» limitado a una cada 15 minutos, y un cubo de fichas global por proveedor (la mitad del peso por minuto publicado por Binance [A VERIFICAR la cifra]).
 
 **Qué no está probado contra el servicio real.** Los nombres de campo de la API de Binance salen de su documentación pública y se validan de forma estricta con datos inventados [A VERIFICAR contra la API real]. Primera prueba real: conecta con una clave de solo lectura, pulsa «Sincronizar ahora» y comprueba el saldo y los depósitos de los últimos 89 días.
+
+## Parámetros fiscales de la pantalla «Impuestos» (opcional)
+
+La pantalla de impuestos no lleva ninguna cifra legal en el código (regla del proyecto): lee de `ref.tax_parameters` (visible para los usuarios mediante la vista `tax_parameters`, que solo escribe el servidor). Mientras no cargues el parámetro del ejercicio, la pantalla lo dice y no calcula. **Las cifras las pones tú, copiadas de la fuente oficial (BOE, AEAT) y con la fecha en que las comprobaste.** Aplícalo con la clave secreta o desde el editor SQL de Supabase, en staging primero.
+
+```sql
+-- Límite anual de aportación a planes de pensiones (importe en céntimos).
+insert into ref.tax_parameters (country, fiscal_year, key, value, source_url, verified_on, note)
+values ('ES', 2026, 'pension_individual_limit',
+        '{"amount_minor": <CÉNTIMOS>, "currency": "EUR"}'::jsonb,
+        '<URL OFICIAL>', '<AAAA-MM-DD en que lo comprobaste>', '<nota opcional>');
+
+-- Escala de la base del ahorro: tramos de menor a mayor; el último, sin límite (null).
+-- Los tipos van como texto entre comillas ("0.19"), nunca como número.
+insert into ref.tax_parameters (country, fiscal_year, key, value, source_url, verified_on)
+values ('ES', 2026, 'savings_brackets',
+        '{"currency": "EUR", "brackets": [
+           {"up_to_minor": <CÉNTIMOS DEL PRIMER TRAMO>, "rate": "<TIPO>"},
+           {"up_to_minor": null, "rate": "<TIPO DEL ÚLTIMO TRAMO>"}]}'::jsonb,
+        '<URL OFICIAL>', '<AAAA-MM-DD>');
+```
+
+Cada cifra mostrada en la web enseña el ejercicio, la fecha de verificación y el enlace a la fuente. Lo que el programa estima (por ejemplo, la ganancia a nivel de cuenta) aparece como estimación con sus supuestos.

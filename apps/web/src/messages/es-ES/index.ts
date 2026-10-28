@@ -456,6 +456,62 @@ export const esES = {
     "Esa clave tiene permisos de más (operar, retirar o transferir). Por seguridad solo se admiten claves de solo lectura: crea otra y vuelve a empezar.",
   "connections.error.provider_unreachable":
     "No hemos podido hablar con Binance. Inténtalo en unos minutos.",
+  "tax.title": "Impuestos: información orientativa",
+  "tax.link": "Impuestos (orientativo)",
+  "tax.intro":
+    "Cálculos informativos con tus propios datos y con parámetros legales que citan su fuente. Los puedes comprobar y cambiar.",
+  "tax.disclaimer":
+    "Son estimaciones. No determinan ninguna obligación ni sustituyen a un profesional: para decidir, consulta la normativa vigente o a tu gestoría.",
+  "tax.missing_parameter":
+    "Falta el parámetro legal de {year} (con su fuente). Cárgalo en la tabla de parámetros fiscales para ver este cálculo.",
+  "tax.error.generic": "No se ha podido calcular con los datos actuales.",
+  "tax.source": "Parámetro del ejercicio {year}, comprobado el {date}.",
+  "tax.source.link": "Ver la fuente",
+  "tax.explain.summary": "¿De dónde sale esta cifra?",
+  "tax.assumptions.title": "Supuestos de esta estimación:",
+  "tax.pension.title": "Plan de pensiones: margen de aportación en {year}",
+  "tax.pension.no_accounts": "No tienes cuentas de tipo plan de pensiones.",
+  "tax.pension.limit": "Límite anual",
+  "tax.pension.contributed": "Aportado este año",
+  "tax.pension.remaining": "Margen que queda",
+  "tax.pension.excess": "Por encima del límite",
+  "tax.compare.title": "Traspaso o venta de un fondo",
+  "tax.compare.intro":
+    "Compara, con datos que tú escribes, qué ocurre con los impuestos y las comisiones si un fondo pasa a otro producto por traspaso o por venta. No indica qué conviene.",
+  "tax.compare.no_funds": "Necesitas una cuenta de fondos de inversión para esta comparación.",
+  "tax.compare.account": "Fondo",
+  "tax.compare.current_ter": "Comisión anual actual (%)",
+  "tax.compare.target_ter": "Comisión anual del destino (%)",
+  "tax.compare.ter_hint": "Porcentaje anual de gastos corrientes (TER). Por ejemplo, 1,5 o 0,2.",
+  "tax.compare.submit": "Calcular",
+  "tax.compare.caption": "Estimación para el fondo elegido",
+  "tax.compare.col.item": "Concepto",
+  "tax.compare.col.transfer": "Traspaso",
+  "tax.compare.col.sale": "Venta",
+  "tax.compare.row.tax_now": "Impuesto ahora",
+  "tax.compare.row.invested": "Dinero que sigue invertido",
+  "tax.compare.row.saving": "Ahorro anual de comisiones",
+  "tax.compare.break_even":
+    "Con la venta, el ahorro de comisiones tardaría unos {years} años en compensar el impuesto pagado.",
+  "tax.compare.no_break_even":
+    "Con la venta, el ahorro de comisiones no compensaría el impuesto pagado.",
+  "tax.compare.estimate_label":
+    "Estimación con supuestos visibles; ninguna de las dos opciones es una recomendación.",
+  "tax.brackets_invalid.message": "La escala fiscal cargada no es válida.",
+  "tax.currency_mismatch.message": "Los importes están en monedas distintas.",
+  "tax.negative_amount.message": "Los importes no pueden ser negativos.",
+  "tax.ter_invalid.message": "Escribe una comisión entre 0 y 100 %.",
+  "tax.caveat.estimate": "Es una estimación orientativa, no una liquidación.",
+  "tax.caveat.losses_not_offset": "No se compensan pérdidas con ganancias de otras operaciones.",
+  "tax.caveat.employer_limit_not_split":
+    "No se separa el límite de las aportaciones de la empresa, si lo hay.",
+  "tax.assumption.constant_fees": "Las comisiones se mantienen constantes.",
+  "tax.assumption.no_returns": "No se supone ninguna rentabilidad futura.",
+  "tax.assumption.gain_at_account_level":
+    "La ganancia se calcula con lo aportado a toda la cuenta, no operación por operación.",
+  "tax.assumption.transfer_defers_tax":
+    "El traspaso entre fondos no tributa en el momento y conserva la antigüedad y el coste [A VERIFICAR con la normativa vigente].",
+  "tax.assumption.no_wash_sale": "No se tiene en cuenta la regla de recompra.",
   "account.institution.label": "Entidad (opcional)",
   "account.institution.hint":
     "El banco, bróker o plataforma donde está. Las cuentas de la misma entidad se agrupan en el inicio.",
