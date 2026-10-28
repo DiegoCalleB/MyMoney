@@ -92,3 +92,10 @@ a {
     transition: none !important;
   }
 }
+
+/* Modo privado: oculta los importes (no los porcentajes) con un desenfoque. */
+[data-privacy="hidden"] .amount {
+  color: transparent;
+  text-shadow: 0 0 10px var(--text);
+  user-select: none;
+}

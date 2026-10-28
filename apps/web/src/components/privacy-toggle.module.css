@@ -1,0 +1,14 @@
+.button {
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.button[aria-pressed="true"] {
+  border-color: var(--accent);
+}

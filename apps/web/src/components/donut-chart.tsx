@@ -1,4 +1,4 @@
-import { formatMoney } from "@/lib/format";
+import { Amount } from "@/components/amount";
 import type { Slice } from "@/server/chart-model";
 import styles from "./donut-chart.module.css";
 
@@ -50,7 +50,7 @@ export function DonutChart({ slices, label }: { slices: readonly Slice[]; label:
               />
               <span className={styles.name}>{s.label}</span>
               <span className={styles.amount}>
-                {formatMoney(s.value)} · {percent(s.shareBps)}
+                <Amount value={s.value} /> · {percent(s.shareBps)}
               </span>
             </li>
           ))}

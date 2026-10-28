@@ -33,6 +33,8 @@ export const esES = {
   "validation.totp_invalid": "El código tiene 6 cifras.",
   "validation.account_kind_invalid": "Elige un tipo de cuenta.",
   "auth.invalid_credentials": "El correo o la contraseña no son correctos.",
+  "privacy.hide": "Ocultar cantidades",
+  "privacy.show": "Mostrar cantidades",
   "common.back": "Volver",
   "common.sign_out": "Salir",
   "common.save": "Guardar",

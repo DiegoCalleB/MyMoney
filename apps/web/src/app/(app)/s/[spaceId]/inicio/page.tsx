@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
+import { Amount } from "@/components/amount";
 import { DonutChart } from "@/components/donut-chart";
-import { formatMoney } from "@/lib/format";
 import { isMessageKey, t } from "@/lib/i18n";
 import { buildSlices, type SliceInput } from "@/server/chart-model";
 import { requireReadyUser } from "@/server/auth";
@@ -50,15 +50,21 @@ export default async function HomePage({ params }: { params: Promise<{ spaceId: 
         <h2 id="patrimonio" className={shell.muted}>
           {t("home.total")}
         </h2>
-        <p className={shell.total}>{formatMoney(value.total)}</p>
+        <p className={shell.total}>
+          <Amount value={value.total} />
+        </p>
         <div className={shell.grid}>
           <div className={shell.card}>
             <p className={shell.muted}>{t("home.assets")}</p>
-            <p>{formatMoney(value.assets)}</p>
+            <p>
+              <Amount value={value.assets} />
+            </p>
           </div>
           <div className={shell.card}>
             <p className={shell.muted}>{t("home.liabilities")}</p>
-            <p>{formatMoney(value.liabilities)}</p>
+            <p>
+              <Amount value={value.liabilities} />
+            </p>
           </div>
         </div>
 
@@ -125,12 +131,16 @@ export default async function HomePage({ params }: { params: Promise<{ spaceId: 
             {value.byPocket.map((pocket) => (
               <li key={pocket.pocketId} className={shell.item}>
                 <span>{data.pockets.get(pocket.pocketId) ?? ""}</span>
-                <span>{formatMoney(pocket.value)}</span>
+                <span>
+                  <Amount value={pocket.value} />
+                </span>
               </li>
             ))}
             <li className={shell.item}>
               <span>{t("home.unassigned")}</span>
-              <span>{formatMoney(value.unassigned)}</span>
+              <span>
+                <Amount value={value.unassigned} />
+              </span>
             </li>
           </ul>
         </section>
@@ -158,7 +168,9 @@ export default async function HomePage({ params }: { params: Promise<{ spaceId: 
                         : t("home.value.age", { days: age })}
                   </span>
                 </span>
-                <span>{formatMoney(line.contribution)}</span>
+                <span>
+                  <Amount value={line.contribution} />
+                </span>
               </li>
             );
           })}
