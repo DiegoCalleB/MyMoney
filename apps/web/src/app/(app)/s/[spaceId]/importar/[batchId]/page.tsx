@@ -10,7 +10,7 @@ import styles from "../../../../../page.module.css";
 import fieldStyles from "@/components/fields.module.css";
 import { ConfirmForm } from "./confirm-form";
 
-export const metadata: Metadata = { title: t("import.preview.title") };
+export const metadata: Metadata = { title: t("importfile.preview.title") };
 
 const REVERT_WINDOW_MS = 24 * 60 * 60 * 1000;
 
@@ -48,7 +48,7 @@ export default async function ImportBatchPage({
     <main id="contenido" className={styles.main}>
       {batch.status === "previewed" ? (
         <>
-          <h1 className={styles.title}>{t("import.preview.title")}</h1>
+          <h1 className={styles.title}>{t("importfile.preview.title")}</h1>
           {hints.plantilla ? (
             <p role="status">
               {t("import.preview.template", { name: t(`import.template.${hints.plantilla}`) })}

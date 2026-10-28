@@ -54,14 +54,14 @@ export async function previewImportAction(
   if (!/\.(csv|xlsx)$/i.test(file.name)) return { fieldErrors: { file: "import.file_not_csv" } };
 
   const space = await loadSpace(supabase, spaceId);
-  if (!space) return { error: "import.failed" };
+  if (!space) return { error: "importfile.failed" };
   const today = calendarDateInZone(new Date(), space.timezone);
   const account = (await loadAccountOptions(supabase, spaceId, today)).find(
     (a) => a.id === accountId,
   );
   // La moneda sale de la cuenta, nunca del archivo ni del formulario.
   if (!account || !isCurrencyCode(account.currency)) {
-    return { fieldErrors: { accountId: "import.account_invalid" } };
+    return { fieldErrors: { accountId: "importfile.account_invalid" } };
   }
 
   const bytes = new Uint8Array(await file.arrayBuffer());
@@ -82,7 +82,7 @@ export async function previewImportAction(
   });
   if (uploaded.error) {
     logger.warn("import.upload_failed", { spaceId });
-    return { error: "import.failed" };
+    return { error: "importfile.failed" };
   }
 
   const preview = await supabase.rpc("import_preview", {
@@ -96,12 +96,12 @@ export async function previewImportAction(
   if (preview.error) {
     logger.warn("import.preview_failed", { code: preview.error.code, spaceId });
     await supabase.storage.from(BUCKET).remove([path]);
-    return { error: "import.failed" };
+    return { error: "importfile.failed" };
   }
   const result = z
     .object({ status: z.enum(["previewed", "already_imported"]), batch_id: z.uuid() })
     .safeParse(preview.data);
-  if (!result.success) return { error: "import.failed" };
+  if (!result.success) return { error: "importfile.failed" };
   if (result.data.status === "already_imported") {
     // Ya se importó antes y su original se borró al confirmar: se retira la copia recién subida.
     await supabase.storage.from(BUCKET).remove([path]);

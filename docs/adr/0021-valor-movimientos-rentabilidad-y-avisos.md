@@ -14,6 +14,8 @@ La primera web solo mostraba una foto del patrimonio a partir de valoraciones. L
 5. **Agrupación por entidad** en el inicio y gráficos por tipo, entidad y bolsillo en SVG sin JavaScript de cliente; modo privado que oculta importes y deja los porcentajes.
 6. **Migraciones aditivas**, aplicadas por la persona propietaria con confirmación: `import_commit`, `movements_after_valuation`, `external_flows`. La web tolera que falten las funciones nuevas (sigue sin ellas y lo registra).
 
+7. **Importación de movimientos pegando el texto de ING** (`packages/importers/ing-paste`): vista previa, confirmación atómica y deshacer 24 h sobre `import_preview` / `import_commit` / `import_revert`. Los traspasos entre cuentas propias, los redondeos y los movimientos retenidos no se importan; del Bizum y las transferencias no se guarda el nombre de nadie. Las categorías de ING se traducen a las del hogar (se crean las que falten) y `import_commit` las acepta en la pata externa, validadas por la base de datos (del espacio, del mismo tipo, no archivadas). Un gasto con importe positivo es un reembolso y resta de su categoría. La pantalla «Gastos» resume el mes con `category_totals` y `monthly_cashflow`.
+
 ## Alternativas consideradas
 - Tratar el saldo del libro como único valor: obliga a cargar todo el historial de cada cuenta.
 - Guardar los avisos en `recommendations`: añade estado que caduca; se reserva para avisos con seguimiento (descartar, resolver).

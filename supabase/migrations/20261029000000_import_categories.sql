@@ -1,11 +1,8 @@
 -- =============================================================================
--- Importación de extractos de brókeres y exchanges: import_commit admite también aportaciones,
--- retiradas, dividendos e intereses (ADR-0008, ADR-0021). Aditiva y compatible hacia atrás: los
--- tipos income y expense siguen igual; solo se amplía la lista de tipos permitidos.
---
--- Cada movimiento sigue llevando una pata de efectivo en la cuenta del lote y una externa que
--- cuadran (regla 16): la aportación y el dividendo/interés entran (+), la retirada y el gasto
--- salen (−). Una compra o venta NO se importa aquí: no cruza el borde del espacio (ADR-0006).
+-- Importación con categorías (ADR-0021). Reemplaza import_commit con la misma firma: ahora cada
+-- movimiento puede traer `category_id` en su pata externa (validada: del espacio, del mismo tipo
+-- y no archivada) y se admite un gasto con importe positivo (reembolso). Aditiva: lo que ya
+-- funcionaba sigue igual. Los permisos de la función no cambian al reemplazarla.
 -- =============================================================================
 
 create or replace function public.import_commit(p_batch_id uuid, p_transactions jsonb, p_opening jsonb default null)
@@ -22,6 +19,7 @@ declare
   r record;
   v_cash bigint;
   v_ext bigint;
+  v_bad integer;
 begin
   select b.* into v_batch from public.import_batches b where b.id = p_batch_id for update;
   if not found or not private.can_write(v_batch.space_id) then
@@ -46,19 +44,24 @@ begin
     select t.row_index, t.kind, t.occurred_on, t.legs
     from jsonb_to_recordset(p_transactions) as t(row_index integer, kind text, occurred_on date, description text, legs jsonb)
   loop
-    if r.row_index is null or r.occurred_on is null or r.kind is null or r.kind not in ('income', 'expense', 'contribution', 'withdrawal', 'dividend', 'interest')
+    if r.row_index is null or r.occurred_on is null or r.kind is null or r.kind not in ('income', 'expense')
        or jsonb_typeof(r.legs) is distinct from 'array' or jsonb_array_length(r.legs) <> 2 then
       raise exception 'Movimiento de importación no válido (fila %)', r.row_index using errcode = 'invalid_parameter_value';
     end if;
+    -- Una categoría solo puede ir en la pata externa y debe ser del espacio, del mismo tipo que el
+    -- movimiento y no estar archivada: el cliente no elige categorías de otros espacios.
     select sum(l.amount_minor) filter (where l.role = 'cash' and l.account_id = v_batch.account_id and l.currency = v_currency),
            sum(l.amount_minor) filter (where l.role = 'external' and l.account_id is null and l.currency = v_currency),
            count(*) filter (where (l.role = 'cash' and l.account_id = v_batch.account_id)
-                              or (l.role = 'external' and l.account_id is null))
-      into v_cash, v_ext, v_n
-    from jsonb_to_recordset(r.legs) as l(role text, account_id uuid, amount_minor bigint, currency text);
-    if v_n <> 2 or v_cash is null or v_ext is null or v_cash = 0 or v_cash + v_ext <> 0
-       or (r.kind in ('income', 'contribution', 'dividend', 'interest') and v_cash < 0)
-       or (r.kind in ('expense', 'withdrawal') and v_cash > 0) then
+                              or (l.role = 'external' and l.account_id is null)),
+           count(*) filter (where l.category_id is not null and (l.role <> 'external' or c.id is null))
+      into v_cash, v_ext, v_n, v_bad
+    from jsonb_to_recordset(r.legs) as l(role text, account_id uuid, category_id uuid, amount_minor bigint, currency text)
+    left join public.categories c on c.id = l.category_id and c.space_id = v_batch.space_id
+      and c.kind = r.kind and c.archived_at is null;
+    -- Un gasto con importe positivo en el efectivo es un reembolso y resta de su categoría.
+    if v_n <> 2 or v_bad <> 0 or v_cash is null or v_ext is null or v_cash = 0 or v_cash + v_ext <> 0
+       or (r.kind = 'income' and v_cash < 0) then
       raise exception 'Patas de importación no válidas (fila %)', r.row_index using errcode = 'invalid_parameter_value';
     end if;
   end loop;
@@ -97,10 +100,10 @@ begin
     from src s
     returning id
   ), new_legs as (
-    insert into public.transaction_legs (transaction_id, space_id, role, account_id, amount_minor, currency)
-    select s.tx_id, v_batch.space_id, l.role, l.account_id, l.amount_minor, l.currency
+    insert into public.transaction_legs (transaction_id, space_id, role, account_id, category_id, amount_minor, currency)
+    select s.tx_id, v_batch.space_id, l.role, l.account_id, l.category_id, l.amount_minor, l.currency
     from src s
-    cross join lateral jsonb_to_recordset(s.legs) as l(role text, account_id uuid, amount_minor bigint, currency text)
+    cross join lateral jsonb_to_recordset(s.legs) as l(role text, account_id uuid, category_id uuid, amount_minor bigint, currency text)
     returning 1
   )
   update public.import_rows ir
@@ -122,7 +125,4 @@ begin
   return jsonb_build_object('batch_id', v_batch.id, 'imported', v_n, 'opening', v_opening is not null);
 end;
 $$;
-comment on function public.import_commit is 'Confirma una vista previa: crea los movimientos (ingreso o gasto sin categoría) de las filas nuevas y, si se pide, un saldo inicial; todo o nada.';
-
-revoke execute on function public.import_commit(uuid, jsonb, jsonb) from public, anon;
-grant execute on function public.import_commit(uuid, jsonb, jsonb) to authenticated;
+comment on function public.import_commit is 'Confirma una vista previa: crea los movimientos (ingreso o gasto, con categoría opcional en la pata externa; un gasto positivo es un reembolso) de las filas nuevas y, si se pide, un saldo inicial; todo o nada.';

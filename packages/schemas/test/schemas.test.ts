@@ -5,6 +5,8 @@ import {
   addMovementInput,
   linkBankInput,
   startBankInput,
+  importBatchInput,
+  importTextInput,
   updateValuesInput,
   defaultLiquidity,
   createSpaceInput,
@@ -192,5 +194,48 @@ describe("conexión bancaria", () => {
   it("linkBankInput pide ids válidos", () => {
     expect(linkBankInput.safeParse({ spaceId, connectionId: spaceId }).success).toBe(true);
     expect(linkBankInput.safeParse({ spaceId, connectionId: "x" }).success).toBe(false);
+  });
+});
+
+describe("importTextInput", () => {
+  const id = "0ecffd10-756b-4ef2-a197-1773972b8e6b";
+  it("exige texto y respeta el tope", () => {
+    expect(importTextInput.safeParse({ spaceId: id, accountId: id, text: "x" }).success).toBe(true);
+    expect(firstError(importTextInput.safeParse({ spaceId: id, accountId: id, text: "" }))).toBe(
+      "import.text_required",
+    );
+    expect(
+      firstError(
+        importTextInput.safeParse({
+          spaceId: id,
+          accountId: id,
+          text: "x".repeat(2 * 1024 * 1024 + 1),
+        }),
+      ),
+    ).toBe("import.file_too_large");
+  });
+  it("recorta el nombre y limita su longitud", () => {
+    const ok = importTextInput.parse({ spaceId: id, accountId: id, text: "x", ownName: "  Ana  " });
+    expect(ok.ownName).toBe("Ana");
+    expect(
+      firstError(
+        importTextInput.safeParse({
+          spaceId: id,
+          accountId: id,
+          text: "x",
+          ownName: "n".repeat(121),
+        }),
+      ),
+    ).toBe("validation.name_too_long");
+  });
+});
+
+describe("importBatchInput", () => {
+  it("pide hogar y lote válidos", () => {
+    const id = "0ecffd10-756b-4ef2-a197-1773972b8e6b";
+    expect(importBatchInput.safeParse({ spaceId: id, batchId: id }).success).toBe(true);
+    expect(firstError(importBatchInput.safeParse({ spaceId: id, batchId: "no" }))).toBe(
+      "validation.invalid_id",
+    );
   });
 });
