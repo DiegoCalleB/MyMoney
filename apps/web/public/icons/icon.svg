@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="MyMoney">
+  <rect width="512" height="512" rx="112" fill="#1f5f4a"/>
+  <rect x="146" y="276" width="52" height="92" rx="10" fill="#ffffff" fill-opacity="0.65"/>
+  <rect x="230" y="222" width="52" height="146" rx="10" fill="#ffffff" fill-opacity="0.85"/>
+  <rect x="314" y="156" width="52" height="212" rx="10" fill="#ffffff"/>
+</svg>
