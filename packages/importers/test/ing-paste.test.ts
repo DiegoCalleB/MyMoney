@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analyzeIngPaste, parseIngPaste } from "../src";
+import { analyzeIngPaste, ingImportTransactions, parseIngPaste } from "../src";
 
 const link = (inner: string) => `[${inner}](https://ing.example/pfm/#)`;
 const ACCOUNT = "00000000-0000-4000-8000-000000000001";
@@ -213,5 +213,19 @@ describe("conceptos", () => {
       description: "SITIO, Aguardiente",
       category: "Luz y gas",
     });
+  });
+});
+
+describe("ingImportTransactions", () => {
+  it("convierte cada fila en ingreso o gasto con patas que cuadran, y filtra por fila", () => {
+    const r = analyzeIngPaste(SAMPLE, ACCOUNT, { ownNames: ["Ana Ejemplo Prueba"] });
+    if (!r.ok) throw new Error(r.error.code);
+    const all = ingImportTransactions(r.value.rows, ACCOUNT);
+    expect(all).toHaveLength(6);
+    expect(all[0]).toMatchObject({ row_index: 1, kind: "expense", occurred_on: "2026-10-28" });
+    expect(all[0]?.legs.map((l) => l.amount_minor)).toEqual(["-509", "509"]);
+    expect(all.find((t) => t.kind === "income")?.legs[0]?.amount_minor).toBe("217329");
+    const some = ingImportTransactions(r.value.rows, ACCOUNT, new Set([2, 4]));
+    expect(some.map((t) => t.row_index)).toEqual([2, 4]);
   });
 });

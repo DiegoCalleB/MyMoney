@@ -9,6 +9,7 @@ import {
   type Result,
 } from "@mymoney/finance-core";
 import { fileSha256, fingerprintRows, toHex } from "./fingerprint";
+import { toTransactionPayload } from "./legs";
 import { cleanDescription, type NormalizedRow } from "./rows";
 import { normalizeText } from "./columns";
 
@@ -219,4 +220,27 @@ export function analyzeIngPaste(
     pending: parsed.pending,
     unreadable: parsed.unreadable,
   });
+}
+
+/**
+ * Carga útil para `import_commit`: un movimiento por fila (ingreso o gasto sin categoría). Con
+ * `only` se limita a esas filas, las que la vista previa marcó como nuevas.
+ */
+export function ingImportTransactions(
+  rows: readonly IngEntry[],
+  accountId: string,
+  only?: ReadonlySet<number>,
+) {
+  return rows
+    .filter((row) => only === undefined || only.has(row.index))
+    .map((row) => {
+      const payload = toTransactionPayload(row, accountId);
+      return {
+        row_index: row.index,
+        kind: payload.kind,
+        occurred_on: payload.occurredOn,
+        description: payload.description,
+        legs: payload.legs,
+      };
+    });
 }
