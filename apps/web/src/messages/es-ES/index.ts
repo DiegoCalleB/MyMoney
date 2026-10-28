@@ -35,6 +35,12 @@ export const esES = {
   "auth.invalid_credentials": "El correo o la contraseña no son correctos.",
   "privacy.hide": "Ocultar cantidades",
   "privacy.show": "Mostrar cantidades",
+  "privacy.shake_enable": "Activar agitar",
+  "privacy.shake_ready": "Agitar activado: agita el móvil para ocultar o mostrar las cantidades.",
+  "privacy.shake_denied":
+    "No has dado permiso al movimiento. En iPhone: Ajustes > Safari > Movimiento y orientación.",
+  "privacy.shake_hidden": "Cantidades ocultas.",
+  "privacy.shake_shown": "Cantidades visibles.",
   "common.back": "Volver",
   "common.sign_out": "Salir",
   "common.save": "Guardar",
