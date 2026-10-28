@@ -19,6 +19,9 @@ const W = 640;
 const H = 280;
 const M = { l: 56, r: 26, t: 14, b: 30 };
 
+/** Hueco (en días) a partir del cual no se une un punto con el anterior: no hay datos entre ambos. */
+const MAX_GAP_DAYS = 90;
+
 const day = (iso: string) =>
   Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10)) / 86_400_000;
 
@@ -74,16 +77,30 @@ export function LineChart({
   for (let v = yMin; v <= yMax + step / 2; v += step) yTicks.push(Number(v.toFixed(10)));
   const xTicks = [0, 1, 2, 3, 4].map((i) => x0 + ((x1 - x0) * i) / 4);
 
+  const gapBefore = (s: ChartSeries, i: number) => {
+    const prev = s.points[i - 1];
+    const cur = s.points[i];
+    return !s.step && prev && cur ? day(cur.date) - day(prev.date) > MAX_GAP_DAYS : false;
+  };
   const path = (s: ChartSeries) =>
     s.points
       .map((p, i) => {
         const x = sx(day(p.date)).toFixed(1);
         const y = sy(p.y).toFixed(1);
-        if (i === 0) return `M${x} ${y}`;
+        if (i === 0 || gapBefore(s, i)) return `M${x} ${y}`;
         if (s.step) return `H${x} V${y}`;
         return `L${x} ${y}`;
       })
       .join(" ");
+  // Un punto aislado (con hueco a ambos lados) no se vería como línea: se marca con un punto.
+  const isolated = (s: ChartSeries) =>
+    s.step
+      ? []
+      : s.points.filter((_, i) => {
+          const before = i === 0 || gapBefore(s, i);
+          const after = i === s.points.length - 1 || gapBefore(s, i + 1);
+          return before && after;
+        });
 
   const summary = `${label}: ${series
     .map((s) => {
@@ -123,12 +140,16 @@ export function LineChart({
           </text>
         ))}
         {series.map((s) => (
-          <path
-            key={s.key}
-            d={path(s)}
-            className={s.tone === "main" ? styles.main : styles.muted}
-            fill="none"
-          />
+          <g key={s.key}>
+            <path
+              d={path(s)}
+              className={s.tone === "main" ? styles.main : styles.muted}
+              fill="none"
+            />
+            {isolated(s).map((p) => (
+              <circle key={p.date} cx={sx(day(p.date))} cy={sy(p.y)} r={3} className={styles.dot} />
+            ))}
+          </g>
         ))}
       </svg>
       {series.length > 1 ? (
