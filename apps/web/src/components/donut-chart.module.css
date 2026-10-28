@@ -1,0 +1,146 @@
+.figure {
+  margin: var(--space-3) 0 0;
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: minmax(8rem, 12rem) 1fr;
+  align-items: center;
+}
+
+@media (max-width: 34rem) {
+  .figure {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+}
+
+.figure {
+  --chart-0: #1f5f4a;
+  --chart-1: #b3470d;
+  --chart-2: #2b6cb0;
+  --chart-3: #8a5a9e;
+  --chart-4: #a38b00;
+  --chart-5: #c0392b;
+  --chart-6: #2a8f9e;
+  --chart-7: #6b6b6b;
+}
+
+@media (prefers-color-scheme: dark) {
+  .figure {
+    --chart-0: #7fd1b1;
+    --chart-1: #ffb37a;
+    --chart-2: #8ab8ff;
+    --chart-3: #d3a8e6;
+    --chart-4: #e0c64a;
+    --chart-5: #ff9b8f;
+    --chart-6: #7fd6e3;
+    --chart-7: #bdbdbd;
+  }
+}
+
+.svg {
+  width: 100%;
+  max-width: 12rem;
+  transform: none;
+}
+
+.track {
+  fill: none;
+  stroke: var(--border);
+  stroke-width: 5;
+}
+
+.c0 {
+  fill: none;
+  stroke: var(--chart-0);
+  stroke-width: 5;
+}
+.c1 {
+  fill: none;
+  stroke: var(--chart-1);
+  stroke-width: 5;
+}
+.c2 {
+  fill: none;
+  stroke: var(--chart-2);
+  stroke-width: 5;
+}
+.c3 {
+  fill: none;
+  stroke: var(--chart-3);
+  stroke-width: 5;
+}
+.c4 {
+  fill: none;
+  stroke: var(--chart-4);
+  stroke-width: 5;
+}
+.c5 {
+  fill: none;
+  stroke: var(--chart-5);
+  stroke-width: 5;
+}
+.c6 {
+  fill: none;
+  stroke: var(--chart-6);
+  stroke-width: 5;
+}
+.c7 {
+  fill: none;
+  stroke: var(--chart-7);
+  stroke-width: 5;
+}
+
+.s0 {
+  background: var(--chart-0);
+}
+.s1 {
+  background: var(--chart-1);
+}
+.s2 {
+  background: var(--chart-2);
+}
+.s3 {
+  background: var(--chart-3);
+}
+.s4 {
+  background: var(--chart-4);
+}
+.s5 {
+  background: var(--chart-5);
+}
+.s6 {
+  background: var(--chart-6);
+}
+.s7 {
+  background: var(--chart-7);
+}
+
+.legend {
+  width: 100%;
+}
+
+.legend ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.legend li {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.swatch {
+  width: 0.9rem;
+  height: 0.9rem;
+  border-radius: 3px;
+}
+
+.amount {
+  color: var(--text-muted);
+  text-align: right;
+}

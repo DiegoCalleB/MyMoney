@@ -1,0 +1,8 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+# Solo estos paquetes pueden ejecutar scripts de instalación (cadena de suministro).
+onlyBuiltDependencies:
+  - esbuild
+  - sharp
+  - unrs-resolver

@@ -1,0 +1,22 @@
+{
+  "name": "@mymoney/finance-core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --coverage"
+  },
+  "dependencies": {
+    "decimal.js": "10.6.0"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "5.0.5",
+    "fast-check": "4.10.2",
+    "vitest": "5.0.5"
+  }
+}

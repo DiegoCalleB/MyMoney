@@ -1,0 +1,10 @@
+# Reglas por defecto de gitleaks más una excepción acotada: el test que comprueba que la web se
+# niega a arrancar con una clave secreta de Supabase usa un valor ficticio con ese prefijo.
+title = "MyMoney"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Valores ficticios de tests"
+paths = ['''apps/web/test/env\.test\.ts''']

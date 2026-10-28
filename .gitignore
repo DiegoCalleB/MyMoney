@@ -1,0 +1,26 @@
+node_modules/
+.next/
+dist/
+coverage/
+reports/
+test-results/
+playwright-report/
+*.tsbuildinfo
+next-env.d.ts
+.env
+.env.*
+!.env.example
+supabase/.temp/
+supabase/.branches/
+.DS_Store
+
+# Datos personales reales: NUNCA al repositorio
+privado/
+*.real.md
+*.real.csv
+
+# Generado por scripts/concat-migrations.sh
+supabase/dist/
+
+# Grafo de conocimiento generado por Graphify (se regenera; no se versiona)
+graphify-out/
