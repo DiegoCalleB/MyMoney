@@ -1,4 +1,4 @@
-import { MINOR_UNITS, toDecimal, type Money } from "@mymoney/finance-core";
+import { MINOR_UNITS, toDecimal, type Decimal, type Money } from "@mymoney/finance-core";
 
 const LOCALE = "es-ES";
 
@@ -15,4 +15,17 @@ export function formatMoney(amount: Money): string {
     minimumFractionDigits: MINOR_UNITS[amount.currency],
     maximumFractionDigits: MINOR_UNITS[amount.currency],
   }).format(toDecimal(amount).toFixed(MINOR_UNITS[amount.currency]) as `${number}`);
+}
+
+/**
+ * Porcentaje con un decimal y signo explícito (+ / −), para que ni la ganancia ni la pérdida
+ * dependan del color. Es una proporción para mostrar, no dinero.
+ */
+export function formatPercentSigned(ratio: Decimal): string {
+  return new Intl.NumberFormat(LOCALE, {
+    style: "percent",
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+    signDisplay: "exceptZero",
+  }).format(Number(ratio.toFixed(6)));
 }

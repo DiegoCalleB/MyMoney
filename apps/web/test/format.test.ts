@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { money } from "@mymoney/finance-core";
-import { formatMoney } from "@/lib/format";
+import { dec, money } from "@mymoney/finance-core";
+import { formatMoney, formatPercentSigned } from "@/lib/format";
 
 const plain = (s: string) => s.replace(/\s/g, " ");
 
@@ -18,5 +18,13 @@ describe("formatMoney", () => {
 
   it("no pierde precisión con importes grandes", () => {
     expect(plain(formatMoney(money(999999999999999n, "EUR")))).toBe("9.999.999.999.999,99 €");
+  });
+});
+
+describe("formatPercentSigned", () => {
+  it("lleva signo explícito y un decimal", () => {
+    expect(plain(formatPercentSigned(dec("0.1234")))).toBe("+12,3 %");
+    expect(plain(formatPercentSigned(dec("-0.05")))).toBe("-5,0 %");
+    expect(plain(formatPercentSigned(dec("0")))).toBe("0,0 %");
   });
 });

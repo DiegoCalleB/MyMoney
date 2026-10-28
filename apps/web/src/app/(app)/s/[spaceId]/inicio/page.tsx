@@ -4,7 +4,9 @@ import { notFound } from "next/navigation";
 import { z } from "zod";
 import { Amount } from "@/components/amount";
 import { DonutChart } from "@/components/donut-chart";
+import { formatPercentSigned } from "@/lib/format";
 import { isMessageKey, t } from "@/lib/i18n";
+import { adviceParams } from "@/server/advice-format";
 import { groupAccounts } from "@/server/group-accounts";
 import { buildSlices, type SliceInput } from "@/server/chart-model";
 import { requireReadyUser } from "@/server/auth";
@@ -43,6 +45,39 @@ export default async function HomePage({ params }: { params: Promise<{ spaceId: 
 
   const charts = buildCharts(data);
   const groups = groupAccounts(explanation.accounts, data.accounts, data.institutions);
+  const renderReturn = (name: string, r: (typeof data.returns.accounts)[number]["result"]) => (
+    <>
+      <p className={shell.returnName}>{name}</p>
+      <dl className={shell.returnGrid}>
+        <div>
+          <dt className={shell.muted}>{t("returns.contributed")}</dt>
+          <dd>
+            <Amount value={r.value.contributed} />
+          </dd>
+        </div>
+        <div>
+          <dt className={shell.muted}>{t("returns.value")}</dt>
+          <dd>
+            <Amount value={r.value.currentValue} />
+          </dd>
+        </div>
+        <div>
+          <dt className={shell.muted}>{t("returns.gain")}</dt>
+          <dd>
+            <Amount value={r.value.gain} signed />
+            {r.value.simple ? ` · ${formatPercentSigned(r.value.simple)}` : ""}
+          </dd>
+        </div>
+        {r.value.annualized ? (
+          <div>
+            <dt className={shell.muted}>{t("returns.annualized")}</dt>
+            <dd>{formatPercentSigned(r.value.annualized)}</dd>
+          </div>
+        ) : null}
+      </dl>
+      <p className={shell.muted}>{t("returns.since", { date: r.explanation.firstFlowDate })}</p>
+    </>
+  );
   const renderLine = (line: (typeof explanation.accounts)[number]) => {
     const meta = data.accounts.get(line.accountId);
     const age = String(line.ageDays);
@@ -147,6 +182,46 @@ export default async function HomePage({ params }: { params: Promise<{ spaceId: 
         </section>
       ) : null}
 
+      <section className={styles.section} aria-labelledby="rentabilidad">
+        <h2 id="rentabilidad" className={styles.heading2}>
+          {t("returns.title")}
+        </h2>
+        {data.returns.accounts.length === 0 ? (
+          <p className={shell.muted}>{t("returns.empty")}</p>
+        ) : (
+          <>
+            <p className={shell.muted}>{t("returns.intro")}</p>
+            <ul className={shell.list}>
+              {data.returns.accounts.map(({ accountId, result }) => (
+                <li key={accountId} className={shell.returnItem}>
+                  {renderReturn(data.accounts.get(accountId)?.name ?? "", result)}
+                </li>
+              ))}
+              {data.returns.total ? (
+                <li className={shell.returnItem}>
+                  {renderReturn(t("returns.total"), data.returns.total)}
+                </li>
+              ) : null}
+            </ul>
+            <details className={shell.explain}>
+              <summary>{t("returns.explain.summary")}</summary>
+              <p>{t("returns.explain.body")}</p>
+              <ul>
+                {[
+                  ...new Set(
+                    [...data.returns.accounts.map((a) => a.result), data.returns.total].flatMap(
+                      (r) => r?.explanation.caveats ?? [],
+                    ),
+                  ),
+                ].map((code) => (
+                  <li key={code}>{t(code)}</li>
+                ))}
+              </ul>
+            </details>
+          </>
+        )}
+      </section>
+
       {value.byPocket.length > 0 ? (
         <section className={styles.section} aria-labelledby="bolsillos">
           <h2 id="bolsillos" className={styles.heading2}>
@@ -225,10 +300,20 @@ export default async function HomePage({ params }: { params: Promise<{ spaceId: 
         <h2 id="avisos" className={styles.heading2}>
           {t("home.notices")}
         </h2>
-        {notices.length === 0 ? (
+        {notices.length === 0 && data.findings.length === 0 ? (
           <p className={shell.muted}>{t("home.notices.none")}</p>
         ) : (
           <ul className={shell.list}>
+            {data.findings.map((finding) => (
+              <li key={finding.messageKey} className={shell.notice}>
+                <p>{t(finding.messageKey, adviceParams(finding, space.base_currency))}</p>
+                <details>
+                  <summary>{t("advice.why.summary")}</summary>
+                  <p>{t("advice.why.body")}</p>
+                  <p className={shell.muted}>{t(`advice.why.confidence_${finding.confidence}`)}</p>
+                </details>
+              </li>
+            ))}
             {notices.map((notice) => (
               <li key={notice.id} className={shell.item}>
                 {t(notice.message_key, noticeParams(notice))}
@@ -236,6 +321,12 @@ export default async function HomePage({ params }: { params: Promise<{ spaceId: 
             ))}
           </ul>
         )}
+        <p className={shell.muted}>{t("advice.limits")}</p>
+        <p className={styles.links}>
+          <Link className={styles.secondary} href={`/s/${spaceId}/supuestos`}>
+            {data.monthlyExpense ? t("assumptions.title") : t("advice.expense_cta")}
+          </Link>
+        </p>
       </section>
     </main>
   );

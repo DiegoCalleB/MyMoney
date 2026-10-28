@@ -1,5 +1,13 @@
 import "server-only";
-import { addDays, netWorth, type NetWorthResult } from "@mymoney/finance-core";
+import {
+  DEFAULT_ADVICE_THRESHOLDS,
+  addDays,
+  evaluateAdvice,
+  money,
+  netWorth,
+  type Finding,
+  type NetWorthResult,
+} from "@mymoney/finance-core";
 import { z } from "zod";
 import { calendarDateInZone } from "@/lib/dates";
 import { logger } from "@/lib/logger";
@@ -11,6 +19,8 @@ import {
   foreignCurrencies,
   fxRow,
   institutionRow,
+  expenseAssumptionRow,
+  externalFlowRow,
   movementsAfterRow,
   noticeRow,
   pocketRow,
@@ -20,6 +30,7 @@ import {
   type NoticeRow,
   type SpaceRow,
 } from "@/server/home-model";
+import { buildReturns, type ReturnsModel } from "@/server/returns-model";
 import type { createSupabaseServerClient } from "@/server/supabase";
 
 type Supabase = Awaited<ReturnType<typeof createSupabaseServerClient>>;
@@ -34,6 +45,10 @@ export interface HomeData {
   readonly accounts: ReadonlyMap<string, AccountMeta>;
   readonly pockets: ReadonlyMap<string, string>;
   readonly institutions: ReadonlyMap<string, string>;
+  readonly returns: ReturnsModel;
+  readonly findings: readonly Finding[];
+  /** Gasto mensual indicado por la persona (supuesto), si lo hay. */
+  readonly monthlyExpense: ReturnType<typeof money> | null;
   readonly notices: readonly NoticeRow[];
 }
 
@@ -72,34 +87,54 @@ export async function loadHome(supabase: Supabase, spaceId: string): Promise<Hom
   if (!space) return null;
   const today = calendarDateInZone(new Date(), space.timezone);
 
-  const [accounts, balances, valuations, allocations, pockets, notices, movements, institutions] =
-    await Promise.all([
-      supabase
-        .from("accounts")
-        .select("id,name,kind,is_liability,currency,scope,closed_on,institution_id")
-        .eq("space_id", spaceId)
-        .is("archived_at", null),
-      supabase.rpc("account_cash_balances", { p_space_id: spaceId, p_on: today }),
-      supabase
-        .from("valuations")
-        .select("account_id,as_of,value_minor,currency")
-        .eq("space_id", spaceId)
-        .is("asset_id", null)
-        .lte("as_of", today)
-        .order("as_of", { ascending: false })
-        .limit(2000),
-      supabase.rpc("pocket_allocations_on", { p_space_id: spaceId, p_on: today }),
-      supabase.from("pockets").select("id,name").eq("space_id", spaceId),
-      supabase
-        .from("recommendations")
-        .select("id,message_key,message_params,severity")
-        .eq("space_id", spaceId)
-        .eq("status", "active")
-        .order("created_at", { ascending: false })
-        .limit(3),
-      supabase.rpc("account_movements_after_valuation", { p_space_id: spaceId, p_on: today }),
-      supabase.from("institutions").select("id,name").eq("space_id", spaceId),
-    ]);
+  const [
+    accounts,
+    balances,
+    valuations,
+    allocations,
+    pockets,
+    notices,
+    movements,
+    institutions,
+    flows,
+    expense,
+  ] = await Promise.all([
+    supabase
+      .from("accounts")
+      .select("id,name,kind,is_liability,currency,scope,closed_on,institution_id")
+      .eq("space_id", spaceId)
+      .is("archived_at", null),
+    supabase.rpc("account_cash_balances", { p_space_id: spaceId, p_on: today }),
+    supabase
+      .from("valuations")
+      .select("account_id,as_of,value_minor,currency")
+      .eq("space_id", spaceId)
+      .is("asset_id", null)
+      .lte("as_of", today)
+      .order("as_of", { ascending: false })
+      .limit(2000),
+    supabase.rpc("pocket_allocations_on", { p_space_id: spaceId, p_on: today }),
+    supabase.from("pockets").select("id,name").eq("space_id", spaceId),
+    supabase
+      .from("recommendations")
+      .select("id,message_key,message_params,severity")
+      .eq("space_id", spaceId)
+      .eq("status", "active")
+      .order("created_at", { ascending: false })
+      .limit(3),
+    supabase.rpc("account_movements_after_valuation", { p_space_id: spaceId, p_on: today }),
+    supabase.from("institutions").select("id,name").eq("space_id", spaceId),
+    supabase.rpc("account_external_flows", { p_space_id: spaceId, p_on: today }),
+    supabase
+      .from("assumptions")
+      .select("value,currency")
+      .eq("space_id", spaceId)
+      .eq("key", "monthly_expense")
+      .is("person_id", null)
+      .lte("effective_from", today)
+      .order("effective_from", { ascending: false })
+      .limit(1),
+  ]);
 
   const accountRows = z
     .array(accountRow)
@@ -114,6 +149,9 @@ export async function loadHome(supabase: Supabase, spaceId: string): Promise<Hom
   const movementsAfter = z
     .array(movementsAfterRow)
     .parse(movements.error ? [] : (movements.data ?? []));
+
+  if (flows.error) logger.warn("db.external_flows_unavailable", { code: flows.error.code });
+  const flowRows = z.array(externalFlowRow).parse(flows.error ? [] : (flows.data ?? []));
 
   let fxRows: z.infer<typeof fxRow>[] = [];
   if (foreignCurrencies({ accounts: accountRows, valuations: valuationRows, space }).length > 0) {
@@ -142,10 +180,48 @@ export async function loadHome(supabase: Supabase, spaceId: string): Promise<Hom
     today,
   );
 
+  const result = netWorth(model.input);
+  const expenseRow = z
+    .array(expenseAssumptionRow)
+    .parse(check("supuestos", expense.error, expense.data ?? []))[0];
+  const monthlyExpense = expenseRow
+    ? money(BigInt(expenseRow.value.split(".")[0] ?? "0"), expenseRow.currency)
+    : null;
+  const findings = evaluateAdvice({
+    baseCurrency: space.base_currency,
+    accounts: result.explanation.accounts.flatMap((line) => {
+      const meta = model.accounts.get(line.accountId);
+      return meta
+        ? [
+            {
+              accountId: line.accountId,
+              institutionId: meta.institutionId,
+              kind: meta.kind,
+              value: line.contribution,
+              ageDays: line.ageDays,
+              stale: line.stale,
+            },
+          ]
+        : [];
+    }),
+    monthlyExpense,
+    thresholds: DEFAULT_ADVICE_THRESHOLDS,
+  });
   return {
     space,
     today,
-    result: netWorth(model.input),
+    result,
+    findings,
+    monthlyExpense,
+    returns: buildReturns(
+      flowRows,
+      result.explanation.accounts,
+      new Map(
+        accountRows.map((a) => [a.id, { currency: a.currency, isLiability: a.is_liability }]),
+      ),
+      space.base_currency,
+      today,
+    ),
     accounts: model.accounts,
     pockets: new Map(
       z

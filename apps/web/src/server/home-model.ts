@@ -235,3 +235,20 @@ export function noticeParams(row: NoticeRow): Record<string, string> {
   }
   return params;
 }
+
+export const externalFlowRow = z.object({
+  account_id: z.uuid(),
+  occurred_on: date,
+  currency,
+  amount_minor: bigintValue,
+});
+export type ExternalFlowRow = z.infer<typeof externalFlowRow>;
+
+/**
+ * Supuesto de gasto mensual (`assumptions.value` en unidades mínimas, numeric). Se toma la parte
+ * entera: los importes en unidades mínimas no tienen decimales.
+ */
+export const expenseAssumptionRow = z.object({
+  value: decimalText,
+  currency,
+});

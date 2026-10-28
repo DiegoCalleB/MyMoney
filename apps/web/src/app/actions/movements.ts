@@ -61,7 +61,8 @@ export async function addMovementAction(
       { role: "cash", account_id: to.id, amount_minor: value, currency: to.currency },
     ];
   } else {
-    const sign = input.kind === "expense" ? -1n : 1n;
+    // Gasto y retirada sacan dinero de la cuenta; ingreso y aportación lo meten.
+    const sign = input.kind === "expense" || input.kind === "withdrawal" ? -1n : 1n;
     kind = input.kind;
     legs = [
       {

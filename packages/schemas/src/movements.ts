@@ -7,11 +7,17 @@ export const isoDate = z
   .trim()
   .regex(/^\d{4}-\d{2}-\d{2}$/, { error: "validation.date_invalid" });
 
-export const MOVEMENT_KINDS = ["expense", "income", "transfer"] as const;
+export const MOVEMENT_KINDS = [
+  "expense",
+  "income",
+  "transfer",
+  "contribution",
+  "withdrawal",
+] as const;
 export type MovementKind = (typeof MOVEMENT_KINDS)[number];
 
 /**
- * Apunte manual de un gasto, un ingreso o un traspaso entre cuentas propias. El importe se
+ * Apunte manual de un gasto, ingreso, traspaso entre cuentas propias, aportación o retirada. El importe se
  * escribe siempre en positivo: el sentido lo da el tipo. Un traspaso necesita cuenta de destino
  * distinta de la de origen.
  */
