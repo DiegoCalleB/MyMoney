@@ -1,6 +1,12 @@
 "use server";
 
-import { analyzeIngPaste, ingImportTransactions } from "@mymoney/importers";
+import {
+  analyzeIngPaste,
+  categoryKey,
+  ingCategory,
+  ingImportTransactions,
+  type CategoryChoice,
+} from "@mymoney/importers";
 import { importBatchInput, importTextInput } from "@mymoney/schemas";
 import { z } from "zod";
 import { fieldErrorsFrom, formText } from "@/components/form-state";
@@ -50,6 +56,51 @@ async function resolveAccount(
   const today = calendarDateInZone(new Date(), space.timezone);
   const accounts = await loadAccountOptions(supabase, spaceId, today);
   return accounts.find((a) => a.id === accountId && !a.is_liability) ?? null;
+}
+
+/**
+ * Asegura que existen las categorías que usará la importación (por tipo y nombre) y devuelve su
+ * id. Las que faltan se crean; las que ya existen, también las archivadas, se reutilizan.
+ */
+async function ensureCategories(
+  supabase: Awaited<ReturnType<typeof requireReadyUser>>["supabase"],
+  spaceId: string,
+  needed: readonly CategoryChoice[],
+): Promise<Map<string, string> | null> {
+  const wanted = new Map(needed.map((c) => [categoryKey(c), c]));
+  const found = await supabase
+    .from("categories")
+    .select("id,name,kind,archived_at")
+    .eq("space_id", spaceId)
+    .limit(1000);
+  if (found.error) return null;
+  const ids = new Map<string, string>();
+  for (const row of z
+    .array(z.object({ id: z.uuid(), name: z.string(), kind: z.enum(["income", "expense"]) }))
+    .parse(found.data)) {
+    ids.set(categoryKey(row), row.id);
+  }
+  const missing = [...wanted.entries()].filter(([key]) => !ids.has(key)).map(([, c]) => c);
+  if (missing.length > 0) {
+    const created = await supabase
+      .from("categories")
+      .insert(
+        missing.map((c) => ({
+          space_id: spaceId,
+          name: c.name,
+          kind: c.kind,
+          essential: c.kind === "expense" && c.essential,
+        })),
+      )
+      .select("id,name,kind");
+    if (created.error) return null;
+    for (const row of z
+      .array(z.object({ id: z.uuid(), name: z.string(), kind: z.enum(["income", "expense"]) }))
+      .parse(created.data)) {
+      ids.set(categoryKey(row), row.id);
+    }
+  }
+  return ids;
 }
 
 /** Lee el texto pegado y registra la vista previa: no crea ningún movimiento. */
@@ -177,13 +228,17 @@ export async function confirmImportAction(
   );
   if (!consistent || fresh.length === 0) return { error: "import.changed" };
 
+  const only = new Set(fresh.map((r) => r.row_index));
+  const categoryIds = await ensureCategories(
+    supabase,
+    spaceId,
+    analysis.value.rows.filter((r) => only.has(r.index)).map(ingCategory),
+  );
+  if (!categoryIds) return { error: "import.failed" };
+
   const commit = await supabase.rpc("import_commit", {
     p_batch_id: batch.data.batchId,
-    p_transactions: ingImportTransactions(
-      analysis.value.rows,
-      accountId,
-      new Set(fresh.map((r) => r.row_index)),
-    ),
+    p_transactions: ingImportTransactions(analysis.value.rows, accountId, only, categoryIds),
   });
   if (commit.error) return failure(commit.error.code);
   const result = commitResult.parse(commit.data);

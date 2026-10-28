@@ -4,6 +4,8 @@ import type { NormalizedRow } from "./rows";
 export interface LegPayload {
   readonly role: "cash" | "external";
   readonly account_id: string | null;
+  /** Categoría del espacio (solo en la pata externa). */
+  readonly category_id?: string;
   /** bigint como texto, como espera `create_transaction`. */
   readonly amount_minor: string;
   readonly currency: CurrencyCode;

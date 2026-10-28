@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { analyzeIngPaste, ingImportTransactions, parseIngPaste } from "../src";
+import {
+  analyzeIngPaste,
+  categoryKey,
+  ingCategory,
+  ingImportTransactions,
+  ingKind,
+  parseIngPaste,
+  type IngEntry,
+} from "../src";
 
 const link = (inner: string) => `[${inner}](https://ing.example/pfm/#)`;
 const ACCOUNT = "00000000-0000-4000-8000-000000000001";
@@ -225,7 +233,72 @@ describe("ingImportTransactions", () => {
     expect(all[0]).toMatchObject({ row_index: 1, kind: "expense", occurred_on: "2026-10-28" });
     expect(all[0]?.legs.map((l) => l.amount_minor)).toEqual(["-509", "509"]);
     expect(all.find((t) => t.kind === "income")?.legs[0]?.amount_minor).toBe("217329");
+    // El reembolso (importe positivo con categoría de gasto) es un gasto, no un ingreso.
+    expect(all.find((t) => t.row_index === 6)?.kind).toBe("expense");
     const some = ingImportTransactions(r.value.rows, ACCOUNT, new Set([2, 4]));
     expect(some.map((t) => t.row_index)).toEqual([2, 4]);
+  });
+});
+
+describe("tipo y categoría", () => {
+  const entry = (category: string | null, minor: bigint) =>
+    parseIngPaste(
+      link(
+        `3 de enero de 2026, Pago en X${category ? `, ${category}` : ""}, Importe: ${(Number(minor) / 100).toString()} €, Balance tras este movimiento: 10 €`,
+      ),
+    ).entries[0] as IngEntry;
+
+  it("distingue ingresos, gastos y reembolsos", () => {
+    expect(ingKind(entry("Nómina o Pensión", 100000n))).toBe("income");
+    expect(ingKind(entry(null, 500n))).toBe("income");
+    expect(ingKind(entry(null, -500n))).toBe("expense");
+    expect(ingKind(entry("Supermercados y alimentación", 399n))).toBe("expense");
+    // Un ingreso con importe negativo se trata como gasto: la base de datos no admite lo contrario.
+    expect(ingKind(entry("Ingreso Bizum", -300n))).toBe("expense");
+  });
+
+  it("traduce las categorías de ING a las de MyMoney", () => {
+    expect(ingCategory(entry("Supermercados y alimentación", -500n))).toEqual({
+      name: "Alimentación",
+      kind: "expense",
+      essential: true,
+    });
+    expect(ingCategory(entry("Farmacia, herbolario y nutrición", -500n)).name).toBe("Salud");
+    expect(ingCategory(entry("Nómina o Pensión", 500n))).toMatchObject({
+      name: "Nómina",
+      kind: "income",
+    });
+    expect(ingCategory(entry("Ingreso Bizum", 500n)).name).toBe("Otros ingresos");
+    expect(ingCategory(entry("Transferencias", -500n)).name).toBe("Otros gastos");
+  });
+
+  it("sin categoría o con una no reconocida va a «Otros»", () => {
+    expect(ingCategory(entry(null, -500n))).toMatchObject({
+      name: "Otros gastos",
+      kind: "expense",
+    });
+    expect(ingCategory(entry(null, 500n))).toMatchObject({
+      name: "Otros ingresos",
+      kind: "income",
+    });
+    // Categoría de ingresos con importe negativo: como gasto, y sin categoría de gasto asociada.
+    expect(ingCategory(entry("Ingreso Bizum", -300n))).toMatchObject({
+      name: "Otros gastos",
+      kind: "expense",
+    });
+    // Una categoría de ING sin correspondencia (p. ej. «Traspaso entre cuentas») cae en «Otros».
+    expect(ingCategory(entry("Redondeo", -300n)).name).toBe("Otros gastos");
+  });
+
+  it("pone la categoría en la pata externa solo si se conoce su id", () => {
+    const row = entry("Supermercados y alimentación", -500n);
+    const key = categoryKey(ingCategory(row));
+    expect(key).toBe("expense|Alimentación");
+    const withIds = ingImportTransactions([row], ACCOUNT, undefined, new Map([[key, "cat-1"]]));
+    expect(withIds[0]?.legs[1]).toMatchObject({ role: "external", category_id: "cat-1" });
+    expect(withIds[0]?.legs[0]).not.toHaveProperty("category_id");
+    expect(
+      ingImportTransactions([row], ACCOUNT, undefined, new Map())[0]?.legs[1],
+    ).not.toHaveProperty("category_id");
   });
 });
