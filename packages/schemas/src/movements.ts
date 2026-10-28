@@ -13,6 +13,8 @@ export const MOVEMENT_KINDS = [
   "transfer",
   "contribution",
   "withdrawal",
+  "dividend",
+  "interest",
 ] as const;
 export type MovementKind = (typeof MOVEMENT_KINDS)[number];
 

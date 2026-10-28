@@ -228,6 +228,65 @@ export const esES = {
   "movement.description_too_long": "La descripción puede tener como máximo 200 caracteres.",
   "movement.new.title": "Apuntar un movimiento",
   "movement.new.link": "Apuntar movimiento",
+  "benchmark.title": "Tu cuenta frente a una referencia",
+  "benchmark.link": "Comparar con una referencia",
+  "benchmark.intro":
+    "Qué habría pasado si hubieras hecho las mismas aportaciones y retiradas, en las mismas fechas, sobre otro instrumento.",
+  "benchmark.no_accounts": "Necesitas una cuenta con aportaciones para poder comparar.",
+  "benchmark.no_prices":
+    "Todavía no hay precios guardados de ninguna referencia. Los precios de criptoactivos se cargan automáticamente cuando se activa esa tarea.",
+  "benchmark.accounts": "Cuenta",
+  "benchmark.instruments": "Referencia",
+  "benchmark.contributed": "Aportado",
+  "benchmark.portfolio": "Ganancia de tu cuenta",
+  "benchmark.reference": "Ganancia con {name}",
+  "benchmark.difference": "Diferencia (tu cuenta menos la referencia)",
+  "benchmark.history_note": "Es información histórica. No indica qué pasará ni qué conviene hacer.",
+  "benchmark.explain.summary": "¿De dónde sale esta cifra?",
+  "benchmark.explain.body":
+    "Cada aportación se convierte en participaciones de la referencia al último precio conocido de ese día o anterior, y cada retirada resta participaciones. Hoy se valoran al último precio disponible.",
+  "benchmark.no_flows.message": "Esta cuenta no tiene aportaciones para comparar.",
+  "benchmark.no_price.message":
+    "No hay precio de esta referencia el {date} o antes. Prueba con otra referencia o espera a tener más historial de precios.",
+  "benchmark.oversold.message":
+    "La retirada del {date} es mayor que lo que habría en la referencia: no se puede comparar.",
+  "benchmark.invalid_price.message": "Hay un precio no válido en la referencia.",
+  "benchmark.currency_mismatch.message":
+    "La referencia y la cuenta deben estar en la misma moneda.",
+  "benchmark.caveat.stale_price": "El último precio de la referencia tiene más de una semana.",
+  "benchmark.caveat.no_positive_contribution":
+    "Lo aportado neto no es positivo: no se calculan porcentajes.",
+  "income.title": "Dividendos e intereses",
+  "income.link": "Ver cobros",
+  "income.intro": "Lo que han ido cobrando tus cuentas, mes a mes. Solo cuenta lo ya cobrado.",
+  "income.empty":
+    "Todavía no hay cobros. Apúntalos como «Un dividendo» o «Unos intereses» al apuntar un movimiento, o impórtalos desde el extracto de tu bróker.",
+  "income.empty.add": "Apuntar un cobro",
+  "income.year": "Cobrado en los últimos 12 meses",
+  "income.dividends": "Dividendos",
+  "income.interest": "Intereses",
+  "income.yield": "Rentabilidad por cobros",
+  "income.estimate": "Estimación para el próximo año",
+  "income.estimate.note":
+    "Estimación: repite lo cobrado el último año. No es una previsión de cobros reales.",
+  "income.months": "Mes a mes",
+  "income.col.month": "Mes",
+  "income.col.dividend": "Dividendos",
+  "income.col.interest": "Intereses",
+  "income.col.total": "Total",
+  "income.ignored": "Hay {count} cobros en otra moneda que no se suman aquí.",
+  "income.explain.summary": "¿De dónde sale esta cifra?",
+  "income.explain.body":
+    "Suma los dividendos e intereses liquidados de tus cuentas del hogar que entraron en los últimos 365 días. La rentabilidad por cobros divide esa suma entre el valor actual de tus cuentas de efectivo e inversión.",
+  "income.caveat.estimate_is_not_forecast":
+    "La estimación del próximo año es solo lo cobrado el año anterior.",
+  "income.caveat.no_events": "No hay cobros registrados.",
+  "income.caveat.short_history":
+    "Hay menos de un año de historia: la estimación puede quedarse corta.",
+  "income.caveat.no_portfolio_value":
+    "Sin valor de cuentas no se puede calcular la rentabilidad por cobros.",
+  "movement.kind.dividend": "Un dividendo (cobro de una inversión)",
+  "movement.kind.interest": "Unos intereses",
   "movement.kind.label": "¿Qué ha pasado?",
   "movement.kind.expense": "Un gasto",
   "movement.kind.income": "Un ingreso",

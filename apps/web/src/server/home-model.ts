@@ -252,3 +252,22 @@ export const expenseAssumptionRow = z.object({
   value: decimalText,
   currency,
 });
+
+/** Dividendo o interés cobrado en una cuenta (`account_income_events`). */
+export const incomeEventRow = z.object({
+  account_id: z.uuid(),
+  occurred_on: date,
+  kind: z.enum(["dividend", "interest"]),
+  currency,
+  amount_minor: bigintValue,
+});
+export type IncomeEventRow = z.infer<typeof incomeEventRow>;
+
+/** Precio de un instrumento en un día (vista `prices`, datos públicos de mercado). */
+export const priceRow = z.object({
+  instrument: z.string().regex(/^[A-Z0-9.:_-]{2,30}$/),
+  as_of: date,
+  price: decimalText,
+  currency,
+});
+export type PriceRow = z.infer<typeof priceRow>;
