@@ -141,6 +141,10 @@ export const esES = {
     "Tu efectivo y tus cuentas de ahorro cubren unos {months} meses de gastos, con los {expense} al mes que indicaste. Tu umbral de aviso es de {limit} meses.",
   "advice.runway_high":
     "Tu efectivo y tus cuentas de ahorro cubren unos {months} meses de gastos, con los {expense} al mes que indicaste, por encima de tu umbral de {limit} meses. Puede ser un buen momento para revisar qué parte necesitas a corto plazo.",
+  "advice.speculative_cap":
+    "Tus bolsillos de riesgo especulativo suponen el {share} de tu patrimonio, por encima del {limit} que tú fijaste. Es un hecho sobre tus propios datos; qué hacer con él lo decides tú.",
+  "advice.planned_due":
+    "Tienes {count} operaciones planificadas con fecha pasada que aún no has marcado como hechas; la más antigua lleva {days} días de retraso. Puedes marcarlas como hechas o ajustar el calendario.",
   "advice.stale_valuations":
     "{count} cuentas tienen un valor de hace más de 31 días, así que las cifras y los avisos pueden no reflejar tu situación. Actualiza sus valores.",
   "advice.why.summary": "¿Por qué me sale este aviso?",

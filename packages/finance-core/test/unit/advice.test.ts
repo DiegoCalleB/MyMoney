@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_ADVICE_THRESHOLDS,
+  calendarDate,
   evaluateAdvice,
   money,
   type AdviceAccount,
@@ -156,5 +157,68 @@ describe("evaluateAdvice", () => {
     expect(f.map((x) => x.severity)).toEqual(
       ["important", "important", "attention", "info"].slice(0, f.length),
     );
+  });
+});
+
+describe("evaluateAdvice: tope especulativo y operaciones vencidas", () => {
+  const pockets = (speculative: bigint, other = 0n): NonNullable<AdviceInput["pockets"]> => [
+    { pocketId: "apuestas", riskLevel: "speculative", value: eur(speculative) },
+    { pocketId: "largo", riskLevel: "medium", value: eur(other) },
+  ];
+  const base = [acc("a", 10_000n)];
+
+  it("avisa cuando los bolsillos especulativos superan el umbral y gradúa la severidad", () => {
+    const attention = evaluateAdvice(input(base, { pockets: pockets(700n) }));
+    expect(attention[0]).toMatchObject({
+      ruleId: "speculative_cap",
+      severity: "attention",
+      params: { shareBps: "700", limitBps: "500" },
+      assumptionsUsed: ["speculative_share_bps"],
+    });
+    const important = evaluateAdvice(input(base, { pockets: pockets(1200n) }));
+    expect(important[0]?.severity).toBe("important");
+  });
+
+  it("no avisa en el umbral exacto, sin bolsillos o con importes no positivos", () => {
+    expect(ids(input(base, { pockets: pockets(500n) }))).not.toContain("advice.speculative_cap");
+    expect(ids(input(base))).not.toContain("advice.speculative_cap");
+    expect(ids(input(base, { pockets: pockets(-300n) }))).not.toContain("advice.speculative_cap");
+  });
+
+  it("el umbral lo pone la persona", () => {
+    const strict = { ...DEFAULT_ADVICE_THRESHOLDS, speculativeShareBps: 100 };
+    expect(ids(input(base, { pockets: pockets(200n), thresholds: strict }))).toContain(
+      "advice.speculative_cap",
+    );
+  });
+
+  const date = (value: string) => calendarDate(value);
+  const schedule = (pending: string[], onDate = "2026-10-28") => ({
+    onDate: date(onDate),
+    pending: pending.map(date),
+  });
+
+  it("avisa de las operaciones planificadas con fecha pasada y cuenta el retraso", () => {
+    const [finding] = evaluateAdvice(
+      input([], { schedule: schedule(["2026-10-20", "2026-10-18", "2026-11-05", "2026-10-28"]) }),
+    );
+    expect(finding).toMatchObject({
+      ruleId: "planned_operation_due",
+      severity: "info",
+      params: { count: "2", days: "10" },
+    });
+  });
+
+  it("una operación con más de dos semanas de retraso pide atención", () => {
+    const [finding] = evaluateAdvice(input([], { schedule: schedule(["2026-10-01"]) }));
+    expect(finding?.severity).toBe("attention");
+    const [recent] = evaluateAdvice(input([], { schedule: schedule(["2026-10-14"]) }));
+    expect(recent?.severity).toBe("info");
+  });
+
+  it("sin vencidas o sin calendario no avisa", () => {
+    expect(ids(input([], { schedule: schedule(["2026-10-28", "2026-12-01"]) }))).toEqual([]);
+    expect(ids(input([], { schedule: schedule([]) }))).toEqual([]);
+    expect(ids(input([]))).toEqual([]);
   });
 });

@@ -87,7 +87,14 @@ export const fxRow = z.object({
 
 export const institutionRow = z.object({ id: z.uuid(), name: z.string() });
 
-export const pocketRow = z.object({ id: z.uuid(), name: z.string() });
+export const pocketRow = z.object({
+  id: z.uuid(),
+  name: z.string(),
+  risk_level: z.enum(["none", "low", "medium", "high", "speculative"]),
+});
+
+/** Operación planificada pendiente: solo su fecha, para avisar de las vencidas. */
+export const plannedPendingRow = z.object({ planned_on: date });
 
 export const allocationRow = z.object({
   pocket_id: z.uuid(),

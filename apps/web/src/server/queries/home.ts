@@ -2,6 +2,7 @@ import "server-only";
 import {
   DEFAULT_ADVICE_THRESHOLDS,
   addDays,
+  calendarDate,
   evaluateAdvice,
   money,
   netWorth,
@@ -23,6 +24,7 @@ import {
   externalFlowRow,
   movementsAfterRow,
   noticeRow,
+  plannedPendingRow,
   pocketRow,
   spaceRow,
   valuationRow,
@@ -98,6 +100,7 @@ export async function loadHome(supabase: Supabase, spaceId: string): Promise<Hom
     institutions,
     flows,
     expense,
+    planned,
   ] = await Promise.all([
     supabase
       .from("accounts")
@@ -114,7 +117,11 @@ export async function loadHome(supabase: Supabase, spaceId: string): Promise<Hom
       .order("as_of", { ascending: false })
       .limit(2000),
     supabase.rpc("pocket_allocations_on", { p_space_id: spaceId, p_on: today }),
-    supabase.from("pockets").select("id,name").eq("space_id", spaceId),
+    supabase
+      .from("pockets")
+      .select("id,name,risk_level")
+      .eq("space_id", spaceId)
+      .is("archived_at", null),
     supabase
       .from("recommendations")
       .select("id,message_key,message_params,severity")
@@ -134,6 +141,13 @@ export async function loadHome(supabase: Supabase, spaceId: string): Promise<Hom
       .lte("effective_from", today)
       .order("effective_from", { ascending: false })
       .limit(1),
+    supabase
+      .from("planned_operations")
+      .select("planned_on")
+      .eq("space_id", spaceId)
+      .eq("status", "planned")
+      .lt("planned_on", today)
+      .limit(200),
   ]);
 
   const accountRows = z
@@ -187,6 +201,13 @@ export async function loadHome(supabase: Supabase, spaceId: string): Promise<Hom
   const monthlyExpense = expenseRow
     ? money(BigInt(expenseRow.value.split(".")[0] ?? "0"), expenseRow.currency)
     : null;
+  const pocketRows = z
+    .array(pocketRow)
+    .parse(check("bolsillos", pockets.error, pockets.data ?? []));
+  const pocketValues = new Map(result.value.byPocket.map((p) => [p.pocketId, p.value]));
+  const plannedRows = z
+    .array(plannedPendingRow)
+    .parse(check("operaciones planificadas", planned.error, planned.data ?? []));
   const findings = evaluateAdvice({
     baseCurrency: space.base_currency,
     accounts: result.explanation.accounts.flatMap((line) => {
@@ -206,6 +227,11 @@ export async function loadHome(supabase: Supabase, spaceId: string): Promise<Hom
     }),
     monthlyExpense,
     thresholds: DEFAULT_ADVICE_THRESHOLDS,
+    pockets: pocketRows.flatMap((p) => {
+      const value = pocketValues.get(p.id);
+      return value ? [{ pocketId: p.id, riskLevel: p.risk_level, value }] : [];
+    }),
+    schedule: { onDate: calendarDate(today), pending: plannedRows.map((r) => r.planned_on) },
   });
   return {
     space,
@@ -223,12 +249,7 @@ export async function loadHome(supabase: Supabase, spaceId: string): Promise<Hom
       today,
     ),
     accounts: model.accounts,
-    pockets: new Map(
-      z
-        .array(pocketRow)
-        .parse(check("bolsillos", pockets.error, pockets.data ?? []))
-        .map((p) => [p.id, p.name]),
-    ),
+    pockets: new Map(pocketRows.map((p) => [p.id, p.name])),
     institutions: new Map(
       z
         .array(institutionRow)
