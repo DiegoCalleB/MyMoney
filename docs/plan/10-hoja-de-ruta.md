@@ -25,7 +25,7 @@ Entregables:
 
 Iteraciones (2 semanas cada una):
 1. Cuentas, titulares, movimientos con patas, valoraciones, tipos del BCE → patrimonio neto (HU-04/05/06/08/09).
-2. Aportado frente a ganado, XIRR, TWR, IPC del INE, historial con patrimonio tras cada acción (HU-10/11/12). **Hecho** (ADR-0022): `finance-core` (`returns`, `real-return`, `ledger-flows`), función `return_legs` y pantalla *Rentabilidad*. **Pendiente**: carga automática del IPC del INE, rentabilidad por bolsillo e historial de patrimonio.
+2. Aportado frente a ganado, XIRR, TWR, IPC del INE, historial con patrimonio tras cada acción (HU-10/11/12). **Hecho** (ADR-0022): `finance-core` (`returns`, `real-return`, `ledger-flows`), función `return_legs` y pantalla *Rentabilidad*. IPC del INE: lector, función de carga y Edge Function (ADR-0023), pendiente de desplegar en *staging*. **Pendiente**: rentabilidad por bolsillo e historial de patrimonio.
 3. Importación CSV idempotente con mapeo; plantillas de tus 2-3 entidades (HU-07).
 4. Objetivos (colchón, vivienda), compras programadas, simulador de caídas, comisiones (HU-13 a 16, 18) **e ingresos y gastos: categorías, resumen mensual y presupuestos (HU-24 a 28)**. Si el calendario aprieta, HU-27 y HU-28 pasan a la iteración siguiente.
 5. Avisos de nivel 1-2, perfil, exportar, borrar, actividad de seguridad (HU-19 a 23). Producción.

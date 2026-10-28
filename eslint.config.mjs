@@ -11,6 +11,8 @@ export default tseslint.config(
       "**/dist/**",
       "**/next-env.d.ts",
       "**/test-results/**",
+      // Código de Deno (Supabase Edge Functions): otro runtime y sin tsconfig de Node.
+      "supabase/functions/**",
       "**/playwright-report/**",
     ],
   },
