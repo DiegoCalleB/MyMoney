@@ -45,7 +45,7 @@ end $f$;
 
 create function tests.seed_space(p_space uuid) returns void language plpgsql as $f$
 declare p1 uuid; p2 uuid; a1 uuid; a2 uuid; a3 uuid; ast uuid; tx uuid; pl uuid; op uuid;
-        rec uuid; bt uuid; cat uuid; pk uuid;
+        rec uuid; bt uuid; cat uuid; pk uuid; cn uuid;
 begin
   insert into public.persons (space_id, display_name, kind) values (p_space, 'P1', 'adult') returning id into p1;
   insert into public.persons (space_id, display_name, kind) values (p_space, 'P2', 'minor') returning id into p2;
@@ -91,6 +91,8 @@ begin
     values (bt, p_space, a1, 0, decode(repeat('02', 32), 'hex'), 'new');
   insert into public.space_invitations (space_id, email_normalized, role, token_hash, expires_at)
     values (p_space, 'x@example.test', 'viewer', decode(repeat('03', 32), 'hex'), now() + interval '1 day');
+  insert into public.connections (space_id, kind, provider) values (p_space, 'api', 'binance') returning id into cn;
+  insert into public.connection_accounts (connection_id, space_id, account_id, external_ref) values (cn, p_space, a2, 'spot');
   set constraints all immediate; -- valida las sumas y el cuadre del fixture
 end $f$;
 
@@ -136,8 +138,8 @@ select is((select coalesce(array_agg(tbl order by tbl), '{}') from tests.write_a
 -- 6-7. Asesor
 select tests.authenticate_as(:'aser');
 select is((select coalesce(array_agg(tbl order by tbl), '{}') from tests.visible_counts(:'sp_a') where n <= 0),
-  array['import_batches', 'import_mappings', 'import_rows', 'space_invitations'],
-  '6. el asesor no ve importaciones ni invitaciones, y sí el resto');
+  array['connection_accounts', 'connections', 'import_batches', 'import_mappings', 'import_rows', 'space_invitations'],
+  '6. el asesor no ve conexiones, importaciones ni invitaciones, y sí el resto');
 select is((select coalesce(array_agg(tbl order by tbl), '{}') from tests.write_attempts(:'sp_a') where touched > 0),
   '{}'::text[], '7. el asesor no puede modificar ni borrar nada');
 select is((select count(*)::int from public.space_members where space_id = :'sp_a'), 1, '8. el asesor solo ve su propia membresía');
