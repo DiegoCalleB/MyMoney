@@ -32,6 +32,9 @@ importers:
       '@mymoney/finance-core':
         specifier: workspace:*
         version: link:../../packages/finance-core
+      '@mymoney/importers':
+        specifier: workspace:*
+        version: link:../../packages/importers
       '@mymoney/schemas':
         specifier: workspace:*
         version: link:../../packages/schemas

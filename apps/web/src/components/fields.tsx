@@ -17,6 +17,8 @@ interface FieldProps {
   readonly required?: boolean;
   readonly pattern?: string;
   readonly placeholder?: string;
+  /** Para campos controlados desde fuera (p. ej. para reenviar su valor en otro formulario). */
+  readonly onValueChange?: (value: string) => void;
   readonly type?: "text" | "email" | "password" | "date";
 }
 
@@ -33,7 +35,16 @@ export function Field({
   const hintId = `${id}-hint`;
   const errorId = `${id}-error`;
   const describedBy = [hint ? hintId : null, error ? errorId : null].filter(Boolean).join(" ");
-  const { name, autoComplete, inputMode, maxLength, defaultValue, pattern, placeholder } = rest;
+  const {
+    name,
+    autoComplete,
+    inputMode,
+    maxLength,
+    defaultValue,
+    pattern,
+    placeholder,
+    onValueChange,
+  } = rest;
   return (
     <div className={styles.field}>
       <label className={styles.label} htmlFor={id}>
@@ -58,6 +69,13 @@ export function Field({
         {...(defaultValue !== undefined ? { defaultValue } : {})}
         {...(pattern ? { pattern } : {})}
         {...(placeholder ? { placeholder } : {})}
+        {...(onValueChange
+          ? {
+              onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
+                onValueChange(event.target.value);
+              },
+            }
+          : {})}
       />
       {error ? (
         <p className={styles.error} id={errorId}>
