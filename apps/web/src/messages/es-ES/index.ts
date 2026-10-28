@@ -166,6 +166,93 @@ export const esES = {
   "movement.currency_mismatch": "Un traspaso solo puede ser entre cuentas de la misma moneda.",
   "movement.no_accounts": "Necesitas al menos una cuenta para apuntar un movimiento.",
   "movement.needs_two_accounts": "Para un traspaso necesitas al menos dos cuentas.",
+  "returns.link": "Rentabilidad",
+  "returns.title": "Rentabilidad",
+  "returns.lead":
+    "Cuánto has puesto, cuánto has ganado y qué ha rendido tu dinero. Cada cifra dice cómo se calcula.",
+  "returns.empty":
+    "Todavía no hay cuentas de inversión con valoraciones. Añade una cuenta y actualiza su valor para ver su rentabilidad.",
+  "returns.total.title": "Conjunto de tus inversiones",
+  "returns.total.needs_two":
+    "El conjunto aparece cuando al menos dos cuentas de inversión tienen valoraciones.",
+  "returns.accounts": "Por cuenta",
+  "returns.period": "Del {from} al {to}, en {currency}.",
+  "returns.gain.title": "Aportado y ganado",
+  "returns.gain.contributed": "Aportado",
+  "returns.gain.withdrawn": "Retirado",
+  "returns.gain.net": "Dinero puesto",
+  "returns.gain.end": "Valor actual",
+  "returns.gain.gain": "Ganado",
+  "returns.gain.opening": "Valor al empezar",
+  "returns.xirr.title": "Rentabilidad de tu dinero",
+  "returns.xirr.hint":
+    "Tiene en cuenta cuándo pusiste cada euro (XIRR). Depende de tus aportaciones.",
+  "returns.twr.title": "Rentabilidad de la inversión",
+  "returns.twr.hint":
+    "Quita el efecto de cuánto y cuándo aportaste (TWR). Sirve para comparar con un fondo o un índice.",
+  "returns.real.title": "Rentabilidad real",
+  "returns.real.hint": "Descontada la inflación. Se calcula sobre la rentabilidad de la inversión.",
+  "returns.real.basis_xirr":
+    "Se calcula sobre la rentabilidad de tu dinero porque faltan valoraciones para la de la inversión.",
+  "returns.real.inflation": "Inflación del periodo: {value}",
+  "returns.annualized": "{value} al año",
+  "returns.cumulative": "{value} en el periodo",
+  "returns.short_period": "Menos de un año: se muestra lo acumulado, no el equivalente anual.",
+  "returns.unavailable": "No se puede calcular: {reason}",
+  "returns.explain.summary": "¿Cómo se calcula?",
+  "returns.explain.assumptions": "Supuestos",
+  "returns.explain.notes": "Avisos sobre los datos",
+  "returns.explain.method": "Método: {method}.",
+  "returns.method.xirr":
+    "tasa anual que iguala lo aportado con lo recuperado, según las fechas (XIRR)",
+  "returns.method.twr": "encadenado de los tramos entre valoraciones (TWR)",
+  "returns.invalid_period": "el periodo no es válido",
+  "returns.flow_outside_period": "hay un movimiento fuera del periodo valorado",
+  "returns.no_flows": "no hay aportaciones ni valor",
+  "returns.same_sign": "hace falta al menos una aportación y un valor final",
+  "returns.no_convergence": "el cálculo no encuentra una solución con estas fechas e importes",
+  "returns.insufficient_valuations": "hacen falta al menos dos valoraciones",
+  "returns.duplicate_valuation_date": "hay dos valoraciones en la misma fecha",
+  "returns.twr_no_computable_segments": "ningún tramo tiene una base de cálculo",
+  "returns.no_nominal_return": "falta la rentabilidad sobre la que calcularla",
+  "returns.cpi_not_available": "faltan datos de inflación (IPC) para estas fechas",
+  "returns.cpi_invalid": "los datos de inflación no son válidos",
+  "returns.xirr_multiple_roots":
+    "Con tantos cambios de aportar y retirar, el cálculo admite más de una solución; se muestra una de ellas.",
+  "returns.twr_dietz_approximation":
+    "Aproximado entre {from} y {to}: hubo aportaciones o retiradas sin valoración ese día.",
+  "returns.twr_segment_skipped":
+    "No se cuenta el tramo de {from} a {to}: empezaba sin dinero invertido.",
+  "returns.cpi_latest_published":
+    "Inflación conocida solo hasta {until}; para fechas posteriores se usa ese último dato.",
+  "returns.series_cost_basis_used":
+    "Una cuenta aún no tenía valoración en {date}: se ha usado lo aportado hasta entonces.",
+  "returns.series_fx_missing":
+    "Falta un tipo de cambio en {date}: una cuenta no se ha sumado ese día.",
+  "returns.xirr_365_day_year": "Un año tiene 365 días.",
+  "returns.xirr_same_day_flows_netted": "Las aportaciones y retiradas del mismo día se suman.",
+  "returns.twr_valuation_includes_same_day_flows":
+    "Cada valoración incluye los movimientos de su día.",
+  "returns.twr_chained_segments": "La rentabilidad de cada tramo entre valoraciones se encadena.",
+  "returns.twr_dietz_when_flow_inside_segment":
+    "Si hubo movimientos dentro de un tramo, se estima con Dietz modificado.",
+  "returns.fees_and_taxes_inside_value":
+    "Las comisiones e impuestos ya están descontados del valor.",
+  "returns.real_ratio_not_difference":
+    "La real se calcula con el cociente, no restando la inflación.",
+  "returns.cpi_monthly_linear_interpolation":
+    "El IPC es mensual; dentro de un mes se interpola entre un índice y el siguiente.",
+  "returns.cpi_index_applies_to_first_day": "Cada índice mensual se toma como el del día 1.",
+  "ledger.flows_internal_transfers_excluded":
+    "Un traspaso entre cuentas del mismo conjunto no es una aportación.",
+  "ledger.flows_fees_taxes_are_costs": "Las comisiones e impuestos son un coste, no una retirada.",
+  "ledger.flows_dividends_interest_are_returns":
+    "Los dividendos e intereses son rendimiento, no aportaciones.",
+  "ledger.flows_fx_on_movement_date": "Las divisas se convierten al tipo del día del movimiento.",
+  "ledger.series_last_valuation_plus_flows":
+    "Cada cuenta vale su última valoración más lo aportado después.",
+  "ledger.series_cost_basis_before_first_valuation":
+    "Antes de su primera valoración, una cuenta vale lo aportado.",
   "values.title": "Actualizar valores",
   "values.link": "Actualizar valores",
   "values.intro":

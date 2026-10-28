@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { money } from "@mymoney/finance-core";
-import { formatMoney } from "@/lib/format";
+import { dec, money } from "@mymoney/finance-core";
+import { formatMoney, formatPercent } from "@/lib/format";
 
 const plain = (s: string) => s.replace(/\s/g, " ");
 
@@ -18,5 +18,13 @@ describe("formatMoney", () => {
 
   it("no pierde precisión con importes grandes", () => {
     expect(plain(formatMoney(money(999999999999999n, "EUR")))).toBe("9.999.999.999.999,99 €");
+  });
+});
+
+describe("formatPercent", () => {
+  it("formatea con dos decimales y signo", () => {
+    expect(plain(formatPercent(dec("0.1")))).toBe("+10,00 %");
+    expect(plain(formatPercent(dec("-0.0534")))).toBe("-5,34 %");
+    expect(plain(formatPercent(dec("0")))).toBe("0,00 %");
   });
 });

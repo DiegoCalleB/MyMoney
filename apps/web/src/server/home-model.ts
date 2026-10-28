@@ -29,11 +29,11 @@ const date = z
  * un importe lo superara, se falla en lugar de redondear en silencio. También se admite texto
  * por si la fuente cambia.
  */
-const bigintValue = z
+export const bigintValue = z
   .union([z.string().regex(/^-?\d{1,18}$/), z.number().refine(Number.isSafeInteger)])
   .transform((v) => BigInt(v));
 
-const decimalText = z
+export const decimalText = z
   .union([z.string(), z.number()])
   .transform(String)
   .pipe(z.string().regex(/^\d+(\.\d+)?$/));

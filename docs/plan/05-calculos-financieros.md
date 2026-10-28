@@ -33,6 +33,8 @@
 
 ### Rentabilidad (`returns/`)
 
+> **Implementado** (ADR-0022): `returns.ts` (`xirr`, `twr`, `contributedVsGained`), `real-return.ts` (`realReturn`) y `ledger-flows.ts` (`externalFlows`, `valueSeries`). Un dividendo o interés no es aportación; una comisión o impuesto tampoco. Pendiente: rendimiento por bolsillo.
+
 **XIRR (rentabilidad ponderada por dinero)**
 Resolver r en  Σᵢ CFᵢ / (1 + r)^((tᵢ − t₀)/365) = 0, donde los flujos son las aportaciones (negativas, desde el punto de vista del inversor), las retiradas (positivas) y el valor final (positivo).
 - Método: Newton-Raphson desde una estimación inicial (rentabilidad simple anualizada), con *fallback* a bisección en [−0,9999; 10] si Newton diverge o la derivada se anula.
