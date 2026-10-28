@@ -50,7 +50,7 @@ Una Edge Function (`supabase/functions/update-prices`) guarda en `ref.prices` el
 1. Aplicar la migración `20261029010000_price_feed.sql` (crea `crypto_tickers()` y `upsert_ref_prices()`, ejecutables solo por `service_role`).
 2. Guardar los secretos de la función (Supabase → Edge Functions → Secrets, o `supabase secrets set`): `PRICE_FEED_SECRET` (aleatorio de 32 bytes o más, `openssl rand -base64 32`). Opcionales: `PRICE_FEED_QUOTE` (`EUR` por defecto) y `BINANCE_API_BASE`. `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` los pone Supabase; la clave secreta no sale de la función.
 3. Desplegar: `supabase functions deploy update-prices`.
-4. Programar con `pg_cron` y `pg_net` (cada 6 horas, a un minuto que no sea 0), guardando el secreto y la clave publicable en Vault, no en el SQL:
+4. Programar con `pg_cron` y `pg_net` (cada 6 horas, a un minuto que no sea 0), guardando el secreto y la clave publicable en Vault, no en el SQL. Despliega esta función con `supabase functions deploy update-prices --no-verify-jwt` (se autentica con `x-cron-secret`):
 
    ```sql
    select cron.schedule('update-prices', '17 */6 * * *', $$
@@ -78,7 +78,9 @@ Lo construido sigue el [ADR-0022](adr/0022-conexiones-automaticas.md) y el capí
    - Si la pierdes, las conexiones no se pueden descifrar y hay que volver a conectarlas (no se pierden datos ya importados).
    - Para rotarla: añade `VAULT_KEK_V2`, cambia `VAULT_KEK_CURRENT` a `2` y conserva la `V1` hasta volver a cifrar.
 3. **Secretos de las funciones** (`supabase secrets set`): `SYNC_WORKER_SECRET` (aleatorio, 32 bytes o más). Opcionales: `SYNC_QUOTE` (`EUR`), `SYNC_MAX_JOBS` (`5`), `BINANCE_API_BASE`. `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` los pone Supabase; la clave secreta no sale de las funciones.
-4. **Desplegar**: `supabase functions deploy connect-binance` y `supabase functions deploy sync-worker`.
+4. **Desplegar**: `supabase functions deploy connect-binance` y `supabase functions deploy sync-worker --no-verify-jwt`.
+   - `sync-worker` (y `update-prices`) se autentican con el secreto compartido de la cabecera `x-cron-secret`, no con un JWT: con las claves publicables nuevas la pasarela de Supabase no valida ese encabezado como JWT [A VERIFICAR en tu proyecto], de ahí `--no-verify-jwt`. Sin el secreto correcto responden 401 sin tocar nada.
+   - `connect-binance` recibe el JWT de la persona. Si tu proyecto usa claves de firma asimétricas y la pasarela lo rechazara, despliégala también con `--no-verify-jwt`: la función vuelve a comprobar el JWT con la base de datos (`can_manage_connection`, con RLS y segundo factor), así que no pierde protección.
 5. **Programar con `pg_cron` y `pg_net`**, con los secretos en Vault (no en el SQL):
 
    ```sql

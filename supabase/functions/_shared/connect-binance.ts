@@ -46,6 +46,10 @@ export async function handleConnectBinance(
   const jwt = /^Bearer (.+)$/.exec(request.headers.get("authorization") ?? "")?.[1];
   if (!jwt) return json(401, { error: "unauthorized" });
 
+  // Primero la cabecera (no se lee un cuerpo enorme) y después el texto leído, por si no la trae.
+  if (Number(request.headers.get("content-length") ?? "0") > MAX_BODY_BYTES) {
+    return json(413, { error: "too_large" });
+  }
   const raw = await request.text();
   if (raw.length > MAX_BODY_BYTES) return json(413, { error: "too_large" });
   let body: Record<string, unknown>;

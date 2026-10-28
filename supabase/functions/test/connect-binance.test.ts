@@ -60,6 +60,16 @@ describe("handleConnectBinance: entrada", () => {
     expect((await run(request({}, undefined, "GET"))).status).toBe(405);
     expect((await run(request({ action: "start", connection_id: CONNECTION_ID }, {}))).status).toBe(401);
     expect((await run(request("x".repeat(5000)))).status).toBe(413);
+    expect(
+      (
+        await run(
+          request({ action: "start", connection_id: CONNECTION_ID }, {
+            authorization: "Bearer jwt-de-prueba",
+            "content-length": "999999",
+          }),
+        )
+      ).status,
+    ).toBe(413);
     expect((await run(request("no es json"))).status).toBe(400);
     expect((await run(request("[]"))).status).toBe(400);
     expect((await run(request({ action: "otra", connection_id: CONNECTION_ID }))).status).toBe(400);

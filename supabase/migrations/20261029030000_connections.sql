@@ -459,7 +459,9 @@ declare
   v_n integer;
   v_minute integer := (extract(hour from now() at time zone 'utc') * 60 + extract(minute from now() at time zone 'utc'))::integer;
 begin
-  if (select auth.role()) is distinct from 'service_role' and current_user <> 'postgres' then
+  -- session_user (no current_user, que en una función security definer es siempre el dueño): quien llama
+  -- por la API entra como authenticator; pg_cron y el administrador, como postgres.
+  if (select auth.role()) is distinct from 'service_role' and session_user not in ('postgres', 'supabase_admin') then
     raise exception 'Solo el servidor puede programar sincronizaciones' using errcode = 'insufficient_privilege';
   end if;
   update public.connections set status = 'expired'
