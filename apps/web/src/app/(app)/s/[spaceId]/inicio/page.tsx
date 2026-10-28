@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { z } from "zod";
 import { Amount } from "@/components/amount";
 import { DonutChart } from "@/components/donut-chart";
-import { formatPercentSigned } from "@/lib/format";
+import { formatPercentSigned, formatShare } from "@/lib/format";
 import { isMessageKey, t } from "@/lib/i18n";
 import { adviceParams } from "@/server/advice-format";
 import { groupAccounts } from "@/server/group-accounts";
@@ -95,8 +95,10 @@ export default async function HomePage({ params }: { params: Promise<{ spaceId: 
                 : t("home.value.age", { days: age })}
           </span>
         </span>
-        <span>
+        <span className={shell.amountCol}>
           <Amount value={line.contribution} />
+          <br />
+          <span className={shell.muted}>{formatShare(line.contribution, value.assets)}</span>
         </span>
       </>
     );
@@ -236,15 +238,19 @@ export default async function HomePage({ params }: { params: Promise<{ spaceId: 
             {value.byPocket.map((pocket) => (
               <li key={pocket.pocketId} className={shell.item}>
                 <span>{data.pockets.get(pocket.pocketId) ?? ""}</span>
-                <span>
+                <span className={shell.amountCol}>
                   <Amount value={pocket.value} />
+                  <br />
+                  <span className={shell.muted}>{formatShare(pocket.value, value.total)}</span>
                 </span>
               </li>
             ))}
             <li className={shell.item}>
               <span>{t("home.unassigned")}</span>
-              <span>
+              <span className={shell.amountCol}>
                 <Amount value={value.unassigned} />
+                <br />
+                <span className={shell.muted}>{formatShare(value.unassigned, value.total)}</span>
               </span>
             </li>
           </ul>
@@ -255,6 +261,7 @@ export default async function HomePage({ params }: { params: Promise<{ spaceId: 
         <h2 id="cuentas" className={styles.heading2}>
           {t("home.accounts")}
         </h2>
+        <p className={shell.muted}>{t("home.accounts.share_hint")}</p>
         <ul className={shell.list}>
           {groups.map((group) =>
             group.lines.length === 1 ? (
@@ -272,8 +279,10 @@ export default async function HomePage({ params }: { params: Promise<{ spaceId: 
                         {t("home.group.count", { count: String(group.lines.length) })}
                       </span>
                     </span>
-                    <span>
+                    <span className={shell.amountCol}>
                       <Amount value={group.total} />
+                      <br />
+                      <span className={shell.muted}>{formatShare(group.total, value.assets)}</span>
                     </span>
                   </summary>
                   <ul className={shell.sublist}>

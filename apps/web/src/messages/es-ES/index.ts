@@ -184,6 +184,8 @@ export const esES = {
   "performance.caveat.not_annualized": "No es una rentabilidad anualizada.",
   "performance.caveat.no_values_before_first":
     "Antes de la primera valoración no hay datos, así que la gráfica empieza más tarde que la primera aportación.",
+  "home.accounts.share_hint":
+    "El porcentaje es lo que pesa cada cuenta o entidad sobre el total de lo que tienes.",
   "home.group.count": "{count} cuentas",
   "home.charts.title": "Tu cartera en gráficos",
   "home.charts.by_kind": "Por tipo de activo",

@@ -29,3 +29,19 @@ export function formatPercentSigned(ratio: Decimal): string {
     signDisplay: "exceptZero",
   }).format(Number(ratio.toFixed(6)));
 }
+
+/**
+ * Parte que supone `part` del `whole`, como porcentaje con un decimal. El reparto se hace en
+ * `bigint` (regla 13); solo el resultado, una proporción, pasa a decimal para mostrarlo. Cadena
+ * vacía si no hay un total positivo o si la parte es negativa (una deuda no es parte de lo que se tiene).
+ */
+export function formatShare(part: Money, whole: Money): string {
+  if (whole.minor <= 0n || part.minor < 0n) return "";
+  // Puntos básicos enteros, como en los gráficos: el redondeo a un decimal lo hace Intl.
+  const bps = (part.minor * 10_000n) / whole.minor;
+  return new Intl.NumberFormat(LOCALE, {
+    style: "percent",
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  }).format(Number(bps) / 10_000);
+}
