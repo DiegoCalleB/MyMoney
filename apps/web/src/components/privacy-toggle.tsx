@@ -2,16 +2,17 @@
 
 import { useEffect, useRef, useState } from "react";
 import { t } from "@/lib/i18n";
+import { createShakeDetector } from "@/lib/shake";
 import styles from "./privacy-toggle.module.css";
 
 export const PRIVACY_COOKIE = "mm_privacy";
-const SHAKE_THRESHOLD = 30; // cambio de aceleración (m/s²) entre dos lecturas
-const SHAKE_WINDOW_MS = 700;
-const SHAKE_COOLDOWN_MS = 1200;
 
 type MotionWithPermission = typeof DeviceMotionEvent & {
   requestPermission?: () => Promise<string>;
 };
+
+/** Espera antes de ofrecer el botón de permiso: si el sensor funciona, llegan lecturas antes. */
+const SENSOR_WAIT_MS = 1500;
 
 function applyPrivacy(hidden: boolean) {
   document
@@ -24,13 +25,18 @@ function applyPrivacy(hidden: boolean) {
 }
 
 /**
- * Botón para ocultar los importes (se mantienen los porcentajes). Además, al agitar el móvil
- * se alterna: en Android funciona al cargar la página; en iPhone el sistema exige un permiso
- * que solo se puede pedir al pulsar, así que se pide la primera vez que se usa el botón.
+ * Botón para ocultar los importes (se mantienen los porcentajes) y gesto de agitar el móvil.
+ * El sensor se escucha siempre: en Android y en cuanto el navegador ya tiene permiso, el gesto
+ * funciona solo. En iPhone el sistema exige un permiso que solo puede pedirse al tocar, así que,
+ * si no llegan lecturas, se ofrece un botón «Activar agitar»; iOS recuerda la respuesta mientras
+ * dure la sesión de Safari.
  */
 export function PrivacyToggle({ initialHidden }: { readonly initialHidden: boolean }) {
   const [hidden, setHidden] = useState(initialHidden);
-  const [shake, setShake] = useState(false);
+  const [sensor, setSensor] = useState<"waiting" | "active" | "needs_permission" | "unavailable">(
+    "waiting",
+  );
+  const [message, setMessage] = useState("");
   const hiddenRef = useRef(hidden);
 
   const set = (next: boolean) => {
@@ -41,59 +47,77 @@ export function PrivacyToggle({ initialHidden }: { readonly initialHidden: boole
 
   useEffect(() => {
     const Motion = window.DeviceMotionEvent as MotionWithPermission | undefined;
-    if (Motion && typeof Motion.requestPermission !== "function") setShake(true);
-  }, []);
-
-  useEffect(() => {
-    if (!shake) return;
-    let last: { x: number; y: number; z: number } | null = null;
-    let firstAt = 0;
-    let lockedUntil = 0;
+    if (!Motion) {
+      setSensor("unavailable");
+      return;
+    }
+    const detect = createShakeDetector();
     const onMotion = (event: DeviceMotionEvent) => {
       const a = event.accelerationIncludingGravity;
       if (a?.x == null || a.y == null || a.z == null) return;
-      const now = Date.now();
-      if (last && now >= lockedUntil) {
-        const delta = Math.abs(a.x - last.x) + Math.abs(a.y - last.y) + Math.abs(a.z - last.z);
-        if (delta > SHAKE_THRESHOLD) {
-          if (now - firstAt > SHAKE_WINDOW_MS) firstAt = now;
-          else {
-            lockedUntil = now + SHAKE_COOLDOWN_MS;
-            firstAt = 0;
-            set(!hiddenRef.current);
-          }
-        }
+      setSensor("active");
+      if (detect({ x: a.x, y: a.y, z: a.z }, Date.now())) {
+        const next = !hiddenRef.current;
+        set(next);
+        setMessage(next ? t("privacy.shake_hidden") : t("privacy.shake_shown"));
       }
-      last = { x: a.x, y: a.y, z: a.z };
     };
     window.addEventListener("devicemotion", onMotion);
+    // Sin lecturas tras un momento: en iOS falta el permiso; en un ordenador no hay sensor.
+    const timer = window.setTimeout(() => {
+      setSensor((current) => {
+        if (current !== "waiting") return current;
+        return typeof Motion.requestPermission === "function" ? "needs_permission" : "unavailable";
+      });
+    }, SENSOR_WAIT_MS);
     return () => {
       window.removeEventListener("devicemotion", onMotion);
+      window.clearTimeout(timer);
     };
-  }, [shake]);
+  }, []);
 
-  const onClick = async () => {
-    set(!hiddenRef.current);
+  const askPermission = async () => {
     const Motion = window.DeviceMotionEvent as MotionWithPermission | undefined;
-    if (!shake && Motion && typeof Motion.requestPermission === "function") {
-      try {
-        if ((await Motion.requestPermission()) === "granted") setShake(true);
-      } catch {
-        // Sin permiso solo se pierde el gesto de agitar; el botón sigue funcionando.
+    if (!Motion || typeof Motion.requestPermission !== "function") return;
+    try {
+      const answer = await Motion.requestPermission();
+      if (answer === "granted") {
+        setSensor("waiting");
+        setMessage(t("privacy.shake_ready"));
+      } else {
+        setMessage(t("privacy.shake_denied"));
       }
+    } catch {
+      setMessage(t("privacy.shake_denied"));
     }
   };
 
   return (
-    <button
-      type="button"
-      className={styles.button}
-      aria-pressed={hidden}
-      onClick={() => {
-        void onClick();
-      }}
-    >
-      {hidden ? t("privacy.show") : t("privacy.hide")}
-    </button>
+    <>
+      <button
+        type="button"
+        className={styles.button}
+        aria-pressed={hidden}
+        onClick={() => {
+          set(!hiddenRef.current);
+        }}
+      >
+        {hidden ? t("privacy.show") : t("privacy.hide")}
+      </button>
+      {sensor === "needs_permission" ? (
+        <button
+          type="button"
+          className={styles.button}
+          onClick={() => {
+            void askPermission();
+          }}
+        >
+          {t("privacy.shake_enable")}
+        </button>
+      ) : null}
+      <span className={styles.live} role="status" aria-live="polite">
+        {message}
+      </span>
+    </>
   );
 }
