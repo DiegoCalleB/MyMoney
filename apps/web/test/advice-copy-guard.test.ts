@@ -12,7 +12,8 @@ const KEYS = Object.keys(esES).filter(
     k.startsWith("returns.") ||
     k.startsWith("income.") ||
     k.startsWith("benchmark.") ||
-    k.startsWith("tax."),
+    k.startsWith("tax.") ||
+    k.startsWith("exposure."),
 );
 
 const ENTITIES =

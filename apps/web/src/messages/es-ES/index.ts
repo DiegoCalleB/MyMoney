@@ -277,6 +277,48 @@ export const esES = {
   "benchmark.caveat.stale_price": "El último precio de la referencia tiene más de una semana.",
   "benchmark.caveat.no_positive_contribution":
     "Lo aportado neto no es positivo: no se calculan porcentajes.",
+  "exposure.title": "¿Cómo está repartido tu dinero?",
+  "exposure.link": "Ver el reparto real",
+  "exposure.intro":
+    "Mira dentro de tus fondos y planes: cuánto hay de verdad en cada clase de activo, región, divisa o sector, según lo que tú has declarado.",
+  "exposure.dimensions": "Reparto por",
+  "exposure.dimension.asset_class": "Clase de activo",
+  "exposure.dimension.region": "Región",
+  "exposure.dimension.currency": "Divisa",
+  "exposure.dimension.sector": "Sector",
+  "exposure.caption": "Reparto por {dimension}",
+  "exposure.col.key": "Concepto",
+  "exposure.col.amount": "Importe",
+  "exposure.col.share": "Parte",
+  "exposure.unclassified": "Sin clasificar",
+  "exposure.empty": "Todavía no hay cuentas de inversión con valor para repartir.",
+  "exposure.error": "No se ha podido calcular el reparto con los datos actuales.",
+  "exposure.explain.summary": "¿De dónde sale esta cifra?",
+  "exposure.explain.body":
+    "Cada cuenta de inversión reparte su valor actual según la última composición que declaraste. Lo que falta hasta el 100 % y las cuentas sin composición quedan como «sin clasificar»: nunca se supone un reparto.",
+  "exposure.caveat.missing_composition": "Hay cuentas sin composición declarada.",
+  "exposure.caveat.partial_composition":
+    "Alguna composición no llega al 100 %: el resto queda sin clasificar.",
+  "exposure.caveat.old_composition":
+    "Alguna composición tiene más de 400 días: puede estar desfasada.",
+  "exposure.undeclared.title": "Cuentas sin reparto declarado",
+  "exposure.undeclared.link": "Declarar el reparto de «{name}»",
+  "exposure.form.title": "Declarar el reparto",
+  "exposure.form.intro":
+    "Escribe cómo está repartido «{name}» según la ficha de su gestora. Si no sabes todo, pon solo lo que conozcas: el resto queda sin clasificar.",
+  "exposure.form.dimension": "¿Por qué quieres repartirlo?",
+  "exposure.form.hint":
+    "Pon una etiqueta y su porcentaje en cada fila (por ejemplo, «Renta variable» y 75). Pueden sumar hasta 100 %.",
+  "exposure.form.key": "Etiqueta {n}",
+  "exposure.form.percent": "Porcentaje {n}",
+  "exposure.form.submit": "Guardar reparto",
+  "exposure.form.failed": "No hemos podido guardar el reparto. Inténtalo de nuevo.",
+  "exposure.form.dimension_invalid": "Elige una forma de repartir válida.",
+  "exposure.form.row_invalid":
+    "Cada fila necesita una etiqueta y un porcentaje mayor que 0 y de hasta 100.",
+  "exposure.form.duplicate": "Hay etiquetas repetidas.",
+  "exposure.form.over_100": "Los porcentajes suman más de 100 %.",
+  "exposure.form.empty": "Escribe al menos una fila.",
   "income.title": "Dividendos e intereses",
   "income.link": "Ver cobros",
   "income.intro": "Lo que han ido cobrando tus cuentas, mes a mes. Solo cuenta lo ya cobrado.",
