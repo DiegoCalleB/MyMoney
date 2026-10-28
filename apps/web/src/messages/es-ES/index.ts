@@ -240,6 +240,24 @@ export const esES = {
   "spend.next": "Mes siguiente",
   "spend.history": "Mes a mes",
   "spend.income_empty": "Sin ingresos este mes.",
+  "review.title": "Para revisar",
+  "review.link": "Cargos para revisar",
+  "review.intro":
+    "Cargos de los últimos 45 días que se salen de lo habitual en tus propios movimientos. No significa que haya un error: solo que merece la pena que los reconozcas.",
+  "review.empty":
+    "No hemos visto nada raro en los últimos 45 días. Seguimos mirando cada vez que entras.",
+  "review.low_data":
+    "Aún hay pocos movimientos para saber qué es lo habitual: importa más meses de tus cuentas para afinar.",
+  "review.note":
+    "Se calcula con tus movimientos importados o apuntados. Compara cada gasto con los anteriores de su categoría y con los cargos de igual descripción. Los umbrales son aproximados.",
+  "review.why.summary": "¿Cómo se detecta?",
+  "review.uncategorized": "Sin categoría",
+  "anomaly.possible_duplicate":
+    "Cargo de {amount} el {date} igual a otro del {other}. Puede ser un cobro duplicado.",
+  "anomaly.recurring_change":
+    "Este cargo suele ser de unos {usual} y ahora es de {amount}. Comprueba si ha cambiado el precio.",
+  "anomaly.unusual_amount":
+    "{amount} en «{category}» es unas {times} veces lo habitual de esa categoría (unos {usual}). Comprueba que lo reconoces.",
   "home.group.count": "{count} cuentas",
   "home.charts.title": "Tu cartera en gráficos",
   "home.charts.by_kind": "Por tipo de activo",

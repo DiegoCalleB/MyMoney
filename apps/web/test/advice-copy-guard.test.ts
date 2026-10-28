@@ -6,7 +6,9 @@ import { esES } from "@/messages/es-ES";
  * no nombran productos ni entidades, no dan órdenes de operar y no hablan de «asesoramiento»
  * ni de «test de idoneidad» salvo para negarlo.
  */
-const KEYS = Object.keys(esES).filter((k) => k.startsWith("advice.") || k.startsWith("returns."));
+const KEYS = Object.keys(esES).filter(
+  (k) => k.startsWith("advice.") || k.startsWith("returns.") || k.startsWith("anomaly."),
+);
 
 const ENTITIES =
   /trade republic|\bing\b|myinvestor|etoro|binance|vanguard|amundi|ishares|blackrock|santander|bbva|caixabank|openbank|indexa|finizens|revolut|degiro|interactive brokers/i;
