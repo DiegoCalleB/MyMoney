@@ -20,6 +20,7 @@ const config: SyncConfig = {
   serviceKey: SERVICE_KEY,
   cronSecret: "secreto-de-prueba",
   binanceBase: "https://binance.example.test",
+  bank: null,
   quote: "EUR",
   minorDigits: 2,
   maxJobs: 5,

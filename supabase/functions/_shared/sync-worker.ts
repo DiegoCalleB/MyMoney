@@ -11,14 +11,23 @@ import {
   type FlowItem,
 } from "./binance.ts";
 import { buildTickerUrl, chunk, MAX_SYMBOLS_PER_REQUEST, parseTickerPrices, utcDate } from "./prices.ts";
+import { authHeaders as bankAuthHeaders, parseBalance, parseTransactions, signApplicationJwt, type BankFlow } from "./enable-banking.ts";
 import { json, serviceRpc, type Fetch, type RpcConfig } from "./rpc.ts";
 import { readBundle } from "./secret-bundle.ts";
 import { VaultError, type Kek } from "./vault.ts";
 import { safeEqual } from "./update-prices.ts";
 
+/** Credenciales de la aplicación ante Enable Banking (uso propio). Sin ellas, las conexiones bancarias fallan limpio. */
+export interface BankProviderConfig {
+  readonly applicationId: string;
+  readonly privateKeyPem: string;
+  readonly apiBase: string;
+}
+
 export interface SyncConfig extends RpcConfig {
   readonly cronSecret: string;
   readonly binanceBase: string;
+  readonly bank: BankProviderConfig | null;
   /** Moneda de las cuentas (la valoración y los movimientos se hacen en ella). */
   readonly quote: string;
   readonly minorDigits: number;
@@ -102,6 +111,24 @@ function keyBundle(bundle: Record<string, unknown>): KeyBundle {
   return { apiKey, privateKey: fromBase64(privateKey) };
 }
 
+async function takeTokens(
+  config: SyncConfig,
+  fetchFn: Fetch,
+  bucket: string,
+  n: number,
+  capacity: number,
+  refillPerSec: number,
+): Promise<void> {
+  const wait = await serviceRpc<number>(config, fetchFn, "take_rate_tokens", {
+    p_bucket: bucket,
+    p_n: n,
+    p_capacity: capacity,
+    p_refill_per_sec: refillPerSec,
+  });
+  if (!wait.ok || typeof wait.data !== "number") throw new JobFailure("retry", "internal");
+  if (wait.data > 0) throw new JobFailure("retry", "rate_limited", wait.data);
+}
+
 /** Sincroniza una conexión de Binance. Devuelve contadores; lanza JobFailure si hay que reintentar o fallar. */
 async function syncBinance(
   job: Job,
@@ -109,14 +136,7 @@ async function syncBinance(
   deps: SyncDeps,
 ): Promise<{ flows: number; unpriced: number }> {
   const { fetchFn } = deps;
-  const wait = await serviceRpc<number>(config, fetchFn, "take_rate_tokens", {
-    p_bucket: GLOBAL_BUCKET,
-    p_n: SYNC_WEIGHT,
-    p_capacity: BUCKET_CAPACITY,
-    p_refill_per_sec: BUCKET_REFILL_PER_SEC,
-  });
-  if (!wait.ok || typeof wait.data !== "number") throw new JobFailure("retry", "internal");
-  if (wait.data > 0) throw new JobFailure("retry", "rate_limited", wait.data);
+  await takeTokens(config, fetchFn, GLOBAL_BUCKET, SYNC_WEIGHT, BUCKET_CAPACITY, BUCKET_REFILL_PER_SEC);
 
   let stored: Awaited<ReturnType<typeof readBundle>>;
   try {
@@ -191,6 +211,105 @@ async function syncBinance(
   }
 }
 
+// PSD2: el banco limita los accesos sin la persona delante (~4 al día por cuenta); se usan 3.
+const BANK_CONN_CAPACITY = 3;
+const BANK_CONN_REFILL_PER_SEC = 3 / 86_400;
+const BANK_GLOBAL_BUCKET = "eb:global";
+const BANK_GLOBAL_CAPACITY = 600;
+const BANK_GLOBAL_REFILL_PER_SEC = 5;
+const BANK_WINDOW_DAYS = 30;
+const BANK_MAX_PAGES = 5;
+
+interface StoredAccount {
+  readonly uid: string;
+  readonly currency: string;
+}
+
+function storedAccounts(value: unknown): StoredAccount[] {
+  if (!Array.isArray(value)) return [];
+  const out: StoredAccount[] = [];
+  for (const item of value as unknown[]) {
+    const entry = (typeof item === "object" && item !== null ? item : {}) as Record<string, unknown>;
+    if (typeof entry.uid === "string") {
+      out.push({ uid: entry.uid, currency: typeof entry.currency === "string" ? entry.currency : "" });
+    }
+  }
+  return out;
+}
+
+/** Sincroniza una conexión PSD2 (Enable Banking): saldo y movimientos de los últimos 30 días de las cuentas vinculadas. */
+async function syncBank(
+  job: Job,
+  config: SyncConfig,
+  deps: SyncDeps,
+): Promise<{ flows: number; unpriced: number }> {
+  const { fetchFn } = deps;
+  if (!config.bank) throw new JobFailure("failed", "provider_not_configured");
+  const bank = config.bank;
+  await takeTokens(config, fetchFn, `eb:conn:${job.connection_id}`, 1, BANK_CONN_CAPACITY, BANK_CONN_REFILL_PER_SEC);
+  await takeTokens(config, fetchFn, BANK_GLOBAL_BUCKET, 1, BANK_GLOBAL_CAPACITY, BANK_GLOBAL_REFILL_PER_SEC);
+
+  let stored: Awaited<ReturnType<typeof readBundle>>;
+  try {
+    stored = await readBundle(config, fetchFn, job.connection_id, deps.keks.byVersion);
+  } catch (error) {
+    throw error instanceof VaultError ? new JobFailure("failed", "secret_unreadable") : error;
+  }
+  if (!stored) throw new JobFailure("failed", "no_secret");
+  const validUntil = stored.bundle.validUntil;
+  if (typeof validUntil === "string" && Date.parse(validUntil) <= deps.now().getTime()) {
+    throw new JobFailure("failed", "consent_expired");
+  }
+  const known = new Map(storedAccounts(stored.bundle.accounts).map((a) => [a.uid, a.currency]));
+
+  const linked = await serviceRpc<{ external_ref: string }[]>(config, fetchFn, "get_connection_accounts", {
+    p_connection_id: job.connection_id,
+  });
+  if (!linked.ok || !Array.isArray(linked.data)) throw new JobFailure("retry", "internal");
+  // Solo se leen las cuentas que la persona vinculó y que siguen en la sesión del banco.
+  const uids = linked.data.map((row) => row.external_ref).filter((uid) => known.has(uid));
+
+  const nowMs = deps.now().getTime();
+  const today = utcDate(deps.now());
+  const from = utcDate(new Date(nowMs - BANK_WINDOW_DAYS * 86_400_000));
+  const flows: BankFlow[] = [];
+  const valuations: { external_ref: string; as_of: string; value_minor: string; currency: string }[] = [];
+
+  const get = async (path: string) => {
+    const jwt = await signApplicationJwt(bank.applicationId, bank.privateKeyPem, Math.floor(nowMs / 1000));
+    return providerGet(fetchFn, `${bank.apiBase}${path}`, bankAuthHeaders(jwt));
+  };
+
+  for (const uid of uids) {
+    const currency = known.get(uid) || config.quote;
+    const balance = parseBalance(await get(`/accounts/${encodeURIComponent(uid)}/balances`), currency, config.minorDigits);
+    if (balance !== null) {
+      valuations.push({ external_ref: uid, as_of: today, value_minor: balance.toString(), currency });
+    }
+    let continuation: string | null = null;
+    for (let page = 0; page < BANK_MAX_PAGES; page += 1) {
+      const query: string =
+        `date_from=${from}&date_to=${today}` + (continuation ? `&continuation_key=${encodeURIComponent(continuation)}` : "");
+      const parsed = parseTransactions(
+        await get(`/accounts/${encodeURIComponent(uid)}/transactions?${query}`),
+        uid,
+        currency,
+        config.minorDigits,
+      );
+      flows.push(...parsed.flows);
+      continuation = parsed.continuationKey;
+      if (continuation === null) break;
+    }
+  }
+
+  const ingested = await serviceRpc<unknown>(config, fetchFn, "ingest_sync", {
+    p_connection_id: job.connection_id,
+    p_payload: { flows, valuations },
+  });
+  if (!ingested.ok) throw new JobFailure("failed", "ingest_failed");
+  return { flows: flows.length, unpriced: 0 };
+}
+
 async function finish(
   config: SyncConfig,
   fetchFn: Fetch,
@@ -230,8 +349,9 @@ export async function handleSyncWorker(
   const summary = { claimed: claimed.data.length, done: 0, retried: 0, failed: 0 };
   for (const job of claimed.data) {
     try {
-      if (job.provider !== "binance") throw new JobFailure("failed", "unsupported_provider");
-      await syncBinance(job, config, deps);
+      if (job.provider === "binance") await syncBinance(job, config, deps);
+      else if (job.provider === "enable_banking") await syncBank(job, config, deps);
+      else throw new JobFailure("failed", "unsupported_provider");
       await finish(config, deps.fetchFn, job.job_id, "done", null);
       summary.done += 1;
     } catch (error) {
