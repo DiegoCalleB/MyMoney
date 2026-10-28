@@ -10,6 +10,7 @@ import {
   buildHomeModel,
   foreignCurrencies,
   fxRow,
+  movementsAfterRow,
   noticeRow,
   pocketRow,
   spaceRow,
@@ -69,31 +70,33 @@ export async function loadHome(supabase: Supabase, spaceId: string): Promise<Hom
   if (!space) return null;
   const today = calendarDateInZone(new Date(), space.timezone);
 
-  const [accounts, balances, valuations, allocations, pockets, notices] = await Promise.all([
-    supabase
-      .from("accounts")
-      .select("id,name,kind,is_liability,currency,scope,closed_on")
-      .eq("space_id", spaceId)
-      .is("archived_at", null),
-    supabase.rpc("account_cash_balances", { p_space_id: spaceId, p_on: today }),
-    supabase
-      .from("valuations")
-      .select("account_id,as_of,value_minor,currency")
-      .eq("space_id", spaceId)
-      .is("asset_id", null)
-      .lte("as_of", today)
-      .order("as_of", { ascending: false })
-      .limit(2000),
-    supabase.rpc("pocket_allocations_on", { p_space_id: spaceId, p_on: today }),
-    supabase.from("pockets").select("id,name").eq("space_id", spaceId),
-    supabase
-      .from("recommendations")
-      .select("id,message_key,message_params,severity")
-      .eq("space_id", spaceId)
-      .eq("status", "active")
-      .order("created_at", { ascending: false })
-      .limit(3),
-  ]);
+  const [accounts, balances, valuations, allocations, pockets, notices, movements] =
+    await Promise.all([
+      supabase
+        .from("accounts")
+        .select("id,name,kind,is_liability,currency,scope,closed_on")
+        .eq("space_id", spaceId)
+        .is("archived_at", null),
+      supabase.rpc("account_cash_balances", { p_space_id: spaceId, p_on: today }),
+      supabase
+        .from("valuations")
+        .select("account_id,as_of,value_minor,currency")
+        .eq("space_id", spaceId)
+        .is("asset_id", null)
+        .lte("as_of", today)
+        .order("as_of", { ascending: false })
+        .limit(2000),
+      supabase.rpc("pocket_allocations_on", { p_space_id: spaceId, p_on: today }),
+      supabase.from("pockets").select("id,name").eq("space_id", spaceId),
+      supabase
+        .from("recommendations")
+        .select("id,message_key,message_params,severity")
+        .eq("space_id", spaceId)
+        .eq("status", "active")
+        .order("created_at", { ascending: false })
+        .limit(3),
+      supabase.rpc("account_movements_after_valuation", { p_space_id: spaceId, p_on: today }),
+    ]);
 
   const accountRows = z
     .array(accountRow)
@@ -101,6 +104,13 @@ export async function loadHome(supabase: Supabase, spaceId: string): Promise<Hom
   const valuationRows = z
     .array(valuationRow)
     .parse(check("valoraciones", valuations.error, valuations.data ?? []));
+
+  // Si la función aún no está en la base de datos (migración pendiente), se sigue sin ella.
+  if (movements.error)
+    logger.warn("db.movements_after_unavailable", { code: movements.error.code });
+  const movementsAfter = z
+    .array(movementsAfterRow)
+    .parse(movements.error ? [] : (movements.data ?? []));
 
   let fxRows: z.infer<typeof fxRow>[] = [];
   if (foreignCurrencies({ accounts: accountRows, valuations: valuationRows, space }).length > 0) {
@@ -120,6 +130,7 @@ export async function loadHome(supabase: Supabase, spaceId: string): Promise<Hom
       accounts: accountRows,
       balances: z.array(balanceRow).parse(check("saldos", balances.error, balances.data ?? [])),
       valuations: valuationRows,
+      movementsAfter,
       fxRates: fxRows,
       allocations: z
         .array(allocationRow)
@@ -141,4 +152,25 @@ export async function loadHome(supabase: Supabase, spaceId: string): Promise<Hom
     ),
     notices: z.array(noticeRow).parse(check("avisos", notices.error, notices.data ?? [])),
   };
+}
+
+export type AccountOption = z.infer<typeof accountRow>;
+
+/** Cuentas del hogar sobre las que se puede apuntar o valorar: propias, abiertas y no archivadas. */
+export async function loadAccountOptions(
+  supabase: Supabase,
+  spaceId: string,
+  today: string,
+): Promise<AccountOption[]> {
+  const { data, error } = await supabase
+    .from("accounts")
+    .select("id,name,kind,is_liability,currency,scope,closed_on")
+    .eq("space_id", spaceId)
+    .eq("scope", "household")
+    .is("archived_at", null)
+    .order("created_at", { ascending: true });
+  return z
+    .array(accountRow)
+    .parse(check("cuentas", error, data ?? []))
+    .filter((a) => a.closed_on === null || a.closed_on > today);
 }

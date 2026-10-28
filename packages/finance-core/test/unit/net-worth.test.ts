@@ -172,4 +172,58 @@ describe("netWorth", () => {
     ]);
     expect(r.explanation.quality.level).toBe("partial");
   });
+
+  it("suma a la valoración los movimientos posteriores y actualiza su antigüedad", () => {
+    const r = netWorth(
+      base({
+        accounts: [
+          {
+            accountId: "banco",
+            isLiability: false,
+            valuation: { amount: money(1_000_00n, "EUR"), asOf: d("2026-10-01") },
+            movementsAfterValuation: { amount: money(-40_00n, "EUR"), asOf: d("2026-10-25") },
+          },
+        ],
+      }),
+    );
+    expect(r.value.total).toEqual(money(960_00n, "EUR"));
+    const line = r.explanation.accounts[0];
+    expect(line?.basis).toBe("valuation");
+    expect(line?.asOf).toBe(d("2026-10-25"));
+    expect(line?.movementsAfterValuation).toEqual(money(-40_00n, "EUR"));
+    expect(r.explanation.assumptions).toContain("net_worth.movements_after_valuation");
+  });
+
+  it("en un pasivo, un pago posterior reduce lo que se debe", () => {
+    const r = netWorth(
+      base({
+        accounts: [
+          {
+            accountId: "prestamo",
+            isLiability: true,
+            valuation: { amount: money(300_00n, "EUR"), asOf: d("2026-10-01") },
+            movementsAfterValuation: { amount: money(50_00n, "EUR"), asOf: d("2026-10-10") },
+          },
+        ],
+      }),
+    );
+    expect(r.value.liabilities).toEqual(money(250_00n, "EUR"));
+    expect(r.value.total).toEqual(money(-250_00n, "EUR"));
+  });
+
+  it("no rejuvenece la valoración si el último movimiento es anterior a ella", () => {
+    const r = netWorth(
+      base({
+        accounts: [
+          {
+            accountId: "banco",
+            isLiability: false,
+            valuation: { amount: money(100_00n, "EUR"), asOf: d("2026-10-20") },
+            movementsAfterValuation: { amount: money(0n, "EUR"), asOf: d("2026-10-05") },
+          },
+        ],
+      }),
+    );
+    expect(r.explanation.accounts[0]?.asOf).toBe(d("2026-10-20"));
+  });
 });

@@ -69,6 +69,13 @@ export const valuationRow = z.object({
   currency,
 });
 
+export const movementsAfterRow = z.object({
+  account_id: z.uuid(),
+  currency,
+  delta_minor: bigintValue,
+  last_on: date,
+});
+
 export const fxRow = z.object({
   base: currency,
   quote: currency,
@@ -99,6 +106,8 @@ export interface HomeRows {
   readonly accounts: readonly z.infer<typeof accountRow>[];
   readonly balances: readonly z.infer<typeof balanceRow>[];
   readonly valuations: readonly z.infer<typeof valuationRow>[];
+  /** Movimientos posteriores a la última valoración de cada cuenta (ver finance-core). */
+  readonly movementsAfter?: readonly z.infer<typeof movementsAfterRow>[] | undefined;
   readonly fxRates: readonly z.infer<typeof fxRow>[];
   readonly allocations: readonly z.infer<typeof allocationRow>[];
 }
@@ -134,6 +143,10 @@ export function buildHomeModel(rows: HomeRows, today: CalendarDate): HomeModel {
   const accounts: AccountInput[] = included.map((a) => {
     const cash = rows.balances.filter((b) => b.account_id === a.id && b.currency === a.currency);
     const valuation = latestValuation.get(a.id);
+    // Solo se suman movimientos en la moneda de la valoración: nunca se mezclan monedas.
+    const after = rows.movementsAfter?.find(
+      (m) => m.account_id === a.id && valuation && m.currency === valuation.currency,
+    );
     return {
       accountId: a.id,
       isLiability: a.is_liability,
@@ -153,6 +166,14 @@ export function buildHomeModel(rows: HomeRows, today: CalendarDate): HomeModel {
             valuation: {
               amount: money(valuation.value_minor, valuation.currency),
               asOf: valuation.as_of,
+            },
+          }
+        : {}),
+      ...(valuation && after
+        ? {
+            movementsAfterValuation: {
+              amount: money(after.delta_minor, after.currency),
+              asOf: after.last_on,
             },
           }
         : {}),

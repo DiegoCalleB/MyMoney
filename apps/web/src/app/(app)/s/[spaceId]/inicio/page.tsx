@@ -164,6 +164,12 @@ export default async function HomePage({ params }: { params: Promise<{ spaceId: 
           })}
         </ul>
         <p className={styles.links}>
+          <Link className={styles.primary} href={`/s/${spaceId}/valores`}>
+            {t("values.link")}
+          </Link>
+          <Link className={styles.secondary} href={`/s/${spaceId}/movimientos/nuevo`}>
+            {t("movement.new.link")}
+          </Link>
           <Link className={styles.secondary} href={newAccount}>
             {t("home.add_account")}
           </Link>

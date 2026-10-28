@@ -17,6 +17,12 @@ export interface AccountInput {
   readonly ledger?: ObservedValue;
   /** Última valoración. En pasivos es lo que se debe (positivo), como guarda `valuations`. */
   readonly valuation?: ObservedValue;
+  /**
+   * Suma de los movimientos liquidados de efectivo posteriores a la fecha de la valoración
+   * (misma moneda que la valoración) y fecha del último. Se añaden a la valoración: así un gasto
+   * apuntado después de valorar la cuenta cambia el patrimonio sin esperar otra valoración.
+   */
+  readonly movementsAfterValuation?: ObservedValue;
 }
 
 /** Reparto vigente de una cuenta entre bolsillos (`pocket_allocations_on`). */
@@ -44,6 +50,8 @@ export interface AccountLine {
   readonly basis: "valuation" | "ledger";
   readonly asOf: CalendarDate;
   readonly original: Money;
+  /** Movimientos posteriores a la valoración que ya están incluidos en `original`, si los hubo. */
+  readonly movementsAfterValuation?: Money;
   /** Aportación al patrimonio en la moneda base (negativa en pasivos). */
   readonly contribution: Money;
   readonly fx: FxExplanation;
@@ -91,16 +99,33 @@ const FULL_BPS = 10_000;
 
 const ASSUMPTIONS = [
   "net_worth.valuation_over_ledger",
+  "net_worth.movements_after_valuation",
   "net_worth.liabilities_subtract",
   "net_worth.fx_latest_on_or_before",
   "net_worth.unallocated_to_unassigned",
 ] as const;
 
-/** Valoración si existe; si no, saldo del libro. En pasivos, la valoración resta. */
-function observed(account: AccountInput): Pick<AccountLine, "basis" | "asOf" | "original"> | null {
+/**
+ * Valoración (más los movimientos posteriores a ella) si existe; si no, saldo del libro. En
+ * pasivos, la valoración resta: es lo que se debe, mientras que los movimientos llevan signo
+ * del libro (un pago de deuda es positivo y reduce lo que se debe).
+ */
+function observed(
+  account: AccountInput,
+): Pick<AccountLine, "basis" | "asOf" | "original" | "movementsAfterValuation"> | null {
   if (account.valuation) {
     const { amount, asOf } = account.valuation;
-    return { basis: "valuation", asOf, original: account.isLiability ? negate(amount) : amount };
+    const signed = account.isLiability ? negate(amount) : amount;
+    const after = account.movementsAfterValuation;
+    if (after) {
+      return {
+        basis: "valuation",
+        asOf: after.asOf > asOf ? after.asOf : asOf,
+        original: add(signed, after.amount),
+        movementsAfterValuation: after.amount,
+      };
+    }
+    return { basis: "valuation", asOf, original: signed };
   }
   if (account.ledger) {
     return { basis: "ledger", asOf: account.ledger.asOf, original: account.ledger.amount };

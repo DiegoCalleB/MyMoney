@@ -10,13 +10,14 @@ interface FieldProps {
   readonly label: string;
   readonly hint?: string;
   readonly error?: string | undefined;
-  readonly type?: "text" | "email" | "password";
   readonly autoComplete?: string;
   readonly inputMode?: "text" | "numeric" | "decimal" | "email";
   readonly maxLength?: number;
   readonly defaultValue?: string;
   readonly required?: boolean;
   readonly pattern?: string;
+  readonly placeholder?: string;
+  readonly type?: "text" | "email" | "password" | "date";
 }
 
 /** Campo con etiqueta visible, ayuda y error asociados (WCAG 2.2: 1.3.1, 3.3.1, 3.3.2). */
@@ -32,7 +33,7 @@ export function Field({
   const hintId = `${id}-hint`;
   const errorId = `${id}-error`;
   const describedBy = [hint ? hintId : null, error ? errorId : null].filter(Boolean).join(" ");
-  const { name, autoComplete, inputMode, maxLength, defaultValue, pattern } = rest;
+  const { name, autoComplete, inputMode, maxLength, defaultValue, pattern, placeholder } = rest;
   return (
     <div className={styles.field}>
       <label className={styles.label} htmlFor={id}>
@@ -56,6 +57,7 @@ export function Field({
         {...(maxLength ? { maxLength } : {})}
         {...(defaultValue !== undefined ? { defaultValue } : {})}
         {...(pattern ? { pattern } : {})}
+        {...(placeholder ? { placeholder } : {})}
       />
       {error ? (
         <p className={styles.error} id={errorId}>

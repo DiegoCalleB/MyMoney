@@ -6,6 +6,7 @@ import {
   buildHomeModel,
   foreignCurrencies,
   fxRow,
+  movementsAfterRow,
   noticeParams,
   noticeRow,
   valuationRow,
@@ -256,5 +257,47 @@ describe("noticeParams", () => {
       message_params: { ok: "texto", numero: 5, largo: "x".repeat(81), anidado: { a: 1 } },
     });
     expect(noticeParams(row)).toEqual({ ok: "texto" });
+  });
+});
+
+describe("movimientos posteriores a la valoración", () => {
+  const valuation = valuationRow.parse({
+    account_id: ID(2),
+    as_of: "2026-10-01",
+    value_minor: "100000",
+    currency: "EUR",
+  });
+  const after = (over: Record<string, unknown> = {}) =>
+    movementsAfterRow.parse({
+      account_id: ID(2),
+      currency: "EUR",
+      delta_minor: -2500,
+      last_on: "2026-10-20",
+      ...over,
+    });
+  const total = (movementsAfter: HomeRows["movementsAfter"]) =>
+    netWorth(
+      buildHomeModel(
+        rows({ accounts: [account(2)], valuations: [valuation], movementsAfter }),
+        today,
+      ).input,
+    ).value.total;
+
+  it("se suman a la valoración de su cuenta", () => {
+    expect(total([after()])).toEqual(money(97500n, "EUR"));
+  });
+
+  it("sin movimientos, o en otra moneda, se usa solo la valoración", () => {
+    expect(total(undefined)).toEqual(money(100000n, "EUR"));
+    expect(total([after({ currency: "USD" })])).toEqual(money(100000n, "EUR"));
+    expect(total([after({ account_id: ID(3) })])).toEqual(money(100000n, "EUR"));
+  });
+
+  it("no se aplican a una cuenta sin valoración", () => {
+    const model = buildHomeModel(
+      rows({ accounts: [account(2)], movementsAfter: [after()] }),
+      today,
+    );
+    expect(model.input.accounts[0]).not.toHaveProperty("movementsAfterValuation");
   });
 });

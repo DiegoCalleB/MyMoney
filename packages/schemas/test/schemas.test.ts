@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   ACCOUNT_KINDS,
   addAccountInput,
+  addMovementInput,
+  updateValuesInput,
   defaultLiquidity,
   createSpaceInput,
   isLiabilityKind,
@@ -114,5 +116,59 @@ describe("defaultLiquidity", () => {
     for (const kind of ACCOUNT_KINDS) {
       expect(["immediate", "days", "months", "illiquid"]).toContain(defaultLiquidity(kind));
     }
+  });
+});
+
+describe("addMovementInput", () => {
+  const id = "0ecffd10-756b-4ef2-a197-1773972b8e6b";
+  const other = "1ecffd10-756b-4ef2-a197-1773972b8e6b";
+  const base = {
+    spaceId: id,
+    kind: "expense",
+    accountId: id,
+    amount: "12,50",
+    occurredOn: "2026-10-27",
+  };
+
+  it("acepta un gasto y recorta la descripción", () => {
+    const ok = addMovementInput.parse({ ...base, description: "  Compra  " });
+    expect(ok.description).toBe("Compra");
+  });
+
+  it("un traspaso necesita un destino distinto del origen", () => {
+    expect(firstError(addMovementInput.safeParse({ ...base, kind: "transfer" }))).toBe(
+      "movement.to_account_required",
+    );
+    expect(
+      firstError(addMovementInput.safeParse({ ...base, kind: "transfer", toAccountId: "" })),
+    ).toBe("movement.to_account_required");
+    expect(
+      firstError(addMovementInput.safeParse({ ...base, kind: "transfer", toAccountId: id })),
+    ).toBe("movement.same_account");
+    expect(
+      addMovementInput.safeParse({ ...base, kind: "transfer", toAccountId: other }).success,
+    ).toBe(true);
+  });
+
+  it("rechaza tipo, fecha y descripción no válidos", () => {
+    expect(firstError(addMovementInput.safeParse({ ...base, kind: "otro" }))).toBe(
+      "movement.kind_invalid",
+    );
+    expect(firstError(addMovementInput.safeParse({ ...base, occurredOn: "27/10/2026" }))).toBe(
+      "validation.date_invalid",
+    );
+    expect(firstError(addMovementInput.safeParse({ ...base, description: "x".repeat(201) }))).toBe(
+      "movement.description_too_long",
+    );
+  });
+});
+
+describe("updateValuesInput", () => {
+  it("exige hogar y fecha en formato ISO", () => {
+    const spaceId = "0ecffd10-756b-4ef2-a197-1773972b8e6b";
+    expect(updateValuesInput.safeParse({ spaceId, asOf: "2026-10-27" }).success).toBe(true);
+    expect(firstError(updateValuesInput.safeParse({ spaceId, asOf: "hoy" }))).toBe(
+      "validation.date_invalid",
+    );
   });
 });
