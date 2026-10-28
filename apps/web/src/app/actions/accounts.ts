@@ -3,6 +3,7 @@
 import { isCurrencyCode, parseLocalizedAmount } from "@mymoney/finance-core";
 import { addAccountInput, defaultLiquidity } from "@mymoney/schemas";
 import { redirect } from "next/navigation";
+import { z } from "zod";
 import { fieldErrorsFrom, formText, type FormState } from "@/components/form-state";
 import { calendarDateInZone } from "@/lib/dates";
 import { logger } from "@/lib/logger";
@@ -24,9 +25,10 @@ export async function addAccountAction(
     kind: formText(formData, "kind"),
     currency: formText(formData, "currency"),
     currentValue: formText(formData, "currentValue"),
+    institution: formText(formData, "institution") || undefined,
   });
   if (!parsed.success) return fieldErrorsFrom(parsed.error);
-  const { spaceId, name, kind, currency, currentValue } = parsed.data;
+  const { spaceId, name, kind, currency, currentValue, institution } = parsed.data;
   if (!isCurrencyCode(currency))
     return { fieldErrors: { currency: "validation.currency_invalid" } };
 
@@ -37,9 +39,41 @@ export async function addAccountAction(
   const space = await loadSpace(supabase, spaceId);
   if (!space) return { error: "account.new.failed" };
 
+  let institutionId: string | null = null;
+  if (institution) {
+    // Una sola fila por entidad: se reutiliza la que ya exista con ese nombre.
+    const found = await supabase
+      .from("institutions")
+      .select("id")
+      .eq("space_id", spaceId)
+      .eq("name", institution)
+      .maybeSingle();
+    const existingId = z.object({ id: z.uuid() }).safeParse(found.data);
+    if (existingId.success) institutionId = existingId.data.id;
+    else {
+      const made = await supabase
+        .from("institutions")
+        .insert({ space_id: spaceId, name: institution })
+        .select("id")
+        .single();
+      if (made.error) {
+        logger.warn("institution.create_failed", { code: made.error.code });
+        return { error: "account.new.failed" };
+      }
+      institutionId = z.uuid().parse(made.data.id);
+    }
+  }
+
   const created = await supabase
     .from("accounts")
-    .insert({ space_id: spaceId, name, kind, currency, liquidity: defaultLiquidity(kind) })
+    .insert({
+      space_id: spaceId,
+      name,
+      kind,
+      currency,
+      liquidity: defaultLiquidity(kind),
+      ...(institutionId ? { institution_id: institutionId } : {}),
+    })
     .select("id")
     .single();
   if (created.error) {

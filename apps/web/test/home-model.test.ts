@@ -26,6 +26,7 @@ const account = (n: number, over: Record<string, unknown> = {}) =>
     currency: "EUR",
     scope: "household",
     closed_on: null,
+    institution_id: null,
     ...over,
   });
 

@@ -10,6 +10,7 @@ import {
   buildHomeModel,
   foreignCurrencies,
   fxRow,
+  institutionRow,
   movementsAfterRow,
   noticeRow,
   pocketRow,
@@ -32,6 +33,7 @@ export interface HomeData {
   readonly result: NetWorthResult;
   readonly accounts: ReadonlyMap<string, AccountMeta>;
   readonly pockets: ReadonlyMap<string, string>;
+  readonly institutions: ReadonlyMap<string, string>;
   readonly notices: readonly NoticeRow[];
 }
 
@@ -70,11 +72,11 @@ export async function loadHome(supabase: Supabase, spaceId: string): Promise<Hom
   if (!space) return null;
   const today = calendarDateInZone(new Date(), space.timezone);
 
-  const [accounts, balances, valuations, allocations, pockets, notices, movements] =
+  const [accounts, balances, valuations, allocations, pockets, notices, movements, institutions] =
     await Promise.all([
       supabase
         .from("accounts")
-        .select("id,name,kind,is_liability,currency,scope,closed_on")
+        .select("id,name,kind,is_liability,currency,scope,closed_on,institution_id")
         .eq("space_id", spaceId)
         .is("archived_at", null),
       supabase.rpc("account_cash_balances", { p_space_id: spaceId, p_on: today }),
@@ -96,6 +98,7 @@ export async function loadHome(supabase: Supabase, spaceId: string): Promise<Hom
         .order("created_at", { ascending: false })
         .limit(3),
       supabase.rpc("account_movements_after_valuation", { p_space_id: spaceId, p_on: today }),
+      supabase.from("institutions").select("id,name").eq("space_id", spaceId),
     ]);
 
   const accountRows = z
@@ -150,6 +153,12 @@ export async function loadHome(supabase: Supabase, spaceId: string): Promise<Hom
         .parse(check("bolsillos", pockets.error, pockets.data ?? []))
         .map((p) => [p.id, p.name]),
     ),
+    institutions: new Map(
+      z
+        .array(institutionRow)
+        .parse(check("entidades", institutions.error, institutions.data ?? []))
+        .map((i) => [i.id, i.name]),
+    ),
     notices: z.array(noticeRow).parse(check("avisos", notices.error, notices.data ?? [])),
   };
 }
@@ -164,7 +173,7 @@ export async function loadAccountOptions(
 ): Promise<AccountOption[]> {
   const { data, error } = await supabase
     .from("accounts")
-    .select("id,name,kind,is_liability,currency,scope,closed_on")
+    .select("id,name,kind,is_liability,currency,scope,closed_on,institution_id")
     .eq("space_id", spaceId)
     .eq("scope", "household")
     .is("archived_at", null)

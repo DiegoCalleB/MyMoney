@@ -5,6 +5,7 @@ import { z } from "zod";
 import { Amount } from "@/components/amount";
 import { DonutChart } from "@/components/donut-chart";
 import { isMessageKey, t } from "@/lib/i18n";
+import { groupAccounts } from "@/server/group-accounts";
 import { buildSlices, type SliceInput } from "@/server/chart-model";
 import { requireReadyUser } from "@/server/auth";
 import { loadHome } from "@/server/queries/home";
@@ -41,6 +42,30 @@ export default async function HomePage({ params }: { params: Promise<{ spaceId: 
   }
 
   const charts = buildCharts(data);
+  const groups = groupAccounts(explanation.accounts, data.accounts, data.institutions);
+  const renderLine = (line: (typeof explanation.accounts)[number]) => {
+    const meta = data.accounts.get(line.accountId);
+    const age = String(line.ageDays);
+    return (
+      <>
+        <span>
+          {meta?.name}
+          <br />
+          <span className={shell.muted}>
+            {meta ? t(`account.kind.${meta.kind}`) : ""} ·{" "}
+            {line.stale
+              ? t("home.value.stale", { days: age })
+              : line.ageDays === 0
+                ? t("home.value.today")
+                : t("home.value.age", { days: age })}
+          </span>
+        </span>
+        <span>
+          <Amount value={line.contribution} />
+        </span>
+      </>
+    );
+  };
   const notices = data.notices.filter((n) => isMessageKey(n.message_key));
   return (
     <main id="contenido" className={styles.main}>
@@ -111,8 +136,8 @@ export default async function HomePage({ params }: { params: Promise<{ spaceId: 
           <p className={shell.muted}>{t("home.charts.note")}</p>
           <h3 className={shell.muted}>{t("home.charts.by_kind")}</h3>
           <DonutChart slices={charts.byKind} label={t("home.charts.by_kind")} />
-          <h3 className={shell.muted}>{t("home.charts.by_account")}</h3>
-          <DonutChart slices={charts.byAccount} label={t("home.charts.by_account")} />
+          <h3 className={shell.muted}>{t("home.charts.by_institution")}</h3>
+          <DonutChart slices={charts.byInstitution} label={t("home.charts.by_institution")} />
           {charts.byPocket.length > 0 ? (
             <>
               <h3 className={shell.muted}>{t("home.charts.by_pocket")}</h3>
@@ -151,29 +176,37 @@ export default async function HomePage({ params }: { params: Promise<{ spaceId: 
           {t("home.accounts")}
         </h2>
         <ul className={shell.list}>
-          {explanation.accounts.map((line) => {
-            const meta = data.accounts.get(line.accountId);
-            const age = String(line.ageDays);
-            return (
-              <li key={line.accountId} className={shell.item}>
-                <span>
-                  {meta?.name}
-                  <br />
-                  <span className={shell.muted}>
-                    {meta ? t(`account.kind.${meta.kind}`) : ""} ·{" "}
-                    {line.stale
-                      ? t("home.value.stale", { days: age })
-                      : line.ageDays === 0
-                        ? t("home.value.today")
-                        : t("home.value.age", { days: age })}
-                  </span>
-                </span>
-                <span>
-                  <Amount value={line.contribution} />
-                </span>
+          {groups.map((group) =>
+            group.lines.length === 1 ? (
+              <li key={group.lines[0]?.accountId} className={shell.item}>
+                {group.lines[0] ? renderLine(group.lines[0]) : null}
               </li>
-            );
-          })}
+            ) : (
+              <li key={group.institutionId ?? group.name} className={shell.group}>
+                <details>
+                  <summary className={shell.groupSummary}>
+                    <span>
+                      {group.name}
+                      <br />
+                      <span className={shell.muted}>
+                        {t("home.group.count", { count: String(group.lines.length) })}
+                      </span>
+                    </span>
+                    <span>
+                      <Amount value={group.total} />
+                    </span>
+                  </summary>
+                  <ul className={shell.sublist}>
+                    {group.lines.map((line) => (
+                      <li key={line.accountId} className={shell.subitem}>
+                        {renderLine(line)}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              </li>
+            ),
+          )}
         </ul>
         <p className={styles.links}>
           <Link className={styles.primary} href={`/s/${spaceId}/valores`}>
@@ -214,11 +247,9 @@ type HomeData = NonNullable<Awaited<ReturnType<typeof loadHome>>>;
 function buildCharts(data: HomeData) {
   const options = { max: 6, otherLabel: t("home.charts.other") };
   const kinds = new Map<string, SliceInput>();
-  const accounts: SliceInput[] = [];
   for (const line of data.result.explanation.accounts) {
     const meta = data.accounts.get(line.accountId);
     if (!meta) continue;
-    accounts.push({ key: line.accountId, label: meta.name, value: line.contribution });
     const previous = kinds.get(meta.kind);
     kinds.set(meta.kind, {
       key: meta.kind,
@@ -237,7 +268,16 @@ function buildCharts(data: HomeData) {
   pockets.push({ key: "unassigned", label: t("home.unassigned"), value: unassigned });
   return {
     byKind: buildSlices([...kinds.values()], options),
-    byAccount: buildSlices(accounts, options),
+    byInstitution: buildSlices(
+      groupAccounts(data.result.explanation.accounts, data.accounts, data.institutions).map(
+        (g) => ({
+          key: g.institutionId ?? g.lines[0]?.accountId ?? g.name,
+          label: g.name,
+          value: g.total,
+        }),
+      ),
+      options,
+    ),
     byPocket: byPocket.length > 0 ? buildSlices(pockets, options) : [],
   };
 }

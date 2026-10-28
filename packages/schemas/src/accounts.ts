@@ -41,6 +41,8 @@ export const addAccountInput = z.object({
   kind: z.enum(ACCOUNT_KINDS, { error: "validation.account_kind_invalid" }),
   currency: currencyCode,
   currentValue: amountText,
+  /** Entidad donde está la cuenta (banco, bróker…). Opcional: agrupa las cuentas en el inicio. */
+  institution: z.string().trim().max(80, { error: "validation.name_too_long" }).optional(),
 });
 export type AddAccountInput = z.infer<typeof addAccountInput>;
 

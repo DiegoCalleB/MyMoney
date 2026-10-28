@@ -54,6 +54,7 @@ export const accountRow = z.object({
   currency,
   scope: z.enum(["household", "external"]),
   closed_on: date.nullable(),
+  institution_id: z.uuid().nullable(),
 });
 
 export const balanceRow = z.object({
@@ -83,6 +84,8 @@ export const fxRow = z.object({
   rate: decimalText,
   source: z.string(),
 });
+
+export const institutionRow = z.object({ id: z.uuid(), name: z.string() });
 
 export const pocketRow = z.object({ id: z.uuid(), name: z.string() });
 
@@ -115,6 +118,7 @@ export interface HomeRows {
 export interface AccountMeta {
   readonly name: string;
   readonly kind: AccountKind;
+  readonly institutionId: string | null;
 }
 
 export interface HomeModel {
@@ -206,7 +210,9 @@ export function buildHomeModel(rows: HomeRows, today: CalendarDate): HomeModel {
       allocations,
       fxRates,
     },
-    accounts: new Map(included.map((a) => [a.id, { name: a.name, kind: a.kind }])),
+    accounts: new Map(
+      included.map((a) => [a.id, { name: a.name, kind: a.kind, institutionId: a.institution_id }]),
+    ),
   };
 }
 

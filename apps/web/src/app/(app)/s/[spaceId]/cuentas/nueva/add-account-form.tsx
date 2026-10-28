@@ -31,6 +31,16 @@ export function AddAccountForm({
         autoComplete="off"
         error={errors?.name}
       />
+      <Field
+        id="institution"
+        name="institution"
+        label={t("account.institution.label")}
+        hint={t("account.institution.hint")}
+        maxLength={80}
+        autoComplete="off"
+        required={false}
+        error={errors?.institution}
+      />
       <div className={styles.field}>
         <label className={styles.label} htmlFor="kind">
           {t("account.kind.label")}
