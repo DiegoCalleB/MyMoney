@@ -28,7 +28,8 @@ export interface AnalyzedRow extends NormalizedRow {
 
 export interface Analysis {
   readonly fileSha256: Uint8Array;
-  readonly delimiter: Delimiter;
+  /** Separador del CSV; `null` si el archivo es una hoja de cálculo. */
+  readonly delimiter: Delimiter | null;
   readonly header: readonly string[];
   readonly mapping: ColumnMapping;
   readonly rows: readonly AnalyzedRow[];
@@ -51,43 +52,57 @@ export interface Analysis {
 }
 
 /**
- * Analiza un CSV de movimientos de una cuenta sin tocar la base de datos: lo lee, detecta (o
- * aplica) el mapeo de columnas, normaliza las filas y calcula sus huellas. Falla con un código
- * estable si el archivo es demasiado grande, está vacío o no se reconocen las columnas.
+ * Analiza las filas de un extracto (de un CSV o de una hoja de cálculo) sin tocar la base de
+ * datos: detecta (o aplica) el mapeo de columnas, normaliza las filas y calcula sus huellas.
+ * Falla con un código estable si está vacío o no se reconocen las columnas.
  */
-export function analyzeCsv(input: AnalyzeInput): Result<Analysis, DomainError> {
-  if (input.bytes.length > MAX_FILE_BYTES) return err({ code: "import.file_too_large" });
-  const table = parseCsv(decodeText(input.bytes));
-  if (!table.ok) return table;
-
-  const [header, ...data] = table.value.rows;
+export function analyzeRows(
+  rows: readonly (readonly string[])[],
+  delimiter: Delimiter | null,
+  input: AnalyzeInput,
+): Result<Analysis, DomainError> {
+  const [header, ...data] = rows;
   if (!header || data.length === 0) return err({ code: "import.no_data" });
 
-  const mapping = input.mapping ?? detectMapping(table.value.rows);
+  const mapping = input.mapping ?? detectMapping(rows);
   if (!mapping || !isValidMapping(mapping, header.length)) {
     return err({ code: "import.mapping_not_detected" });
   }
 
-  const { rows, errors } = normalizeRows(data, mapping, input.currency);
-  const fingerprints = fingerprintRows(input.accountId, rows);
-  const analyzed = rows.map((row, i) => ({ ...row, fingerprint: fingerprints[i] as Uint8Array }));
-  const dates = rows.map((r) => r.date).sort();
+  const normalized = normalizeRows(data, mapping, input.currency);
+  const fingerprints = fingerprintRows(input.accountId, normalized.rows);
+  const analyzed = normalized.rows.map((row, i) => ({
+    ...row,
+    fingerprint: fingerprints[i] as Uint8Array,
+  }));
+  const dates = normalized.rows.map((r) => r.date).sort();
 
   return ok({
     fileSha256: fileSha256(input.bytes),
-    delimiter: table.value.delimiter,
+    delimiter,
     header,
     mapping,
     rows: analyzed,
-    errors,
+    errors: normalized.errors,
     skipped: 0,
     template: null,
     summary: {
       dataRows: data.length,
-      validRows: rows.length,
+      validRows: normalized.rows.length,
       from: dates[0] ?? null,
       to: dates[dates.length - 1] ?? null,
       hasBalance: mapping.balanceColumn !== null,
     },
   });
+}
+
+/**
+ * Analiza un CSV de movimientos de una cuenta: lo lee con los límites de tamaño y de forma y
+ * delega en `analyzeRows`.
+ */
+export function analyzeCsv(input: AnalyzeInput): Result<Analysis, DomainError> {
+  if (input.bytes.length > MAX_FILE_BYTES) return err({ code: "import.file_too_large" });
+  const table = parseCsv(decodeText(input.bytes));
+  if (!table.ok) return table;
+  return analyzeRows(table.value.rows, table.value.delimiter, input);
 }

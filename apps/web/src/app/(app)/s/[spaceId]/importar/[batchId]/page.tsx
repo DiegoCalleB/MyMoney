@@ -16,7 +16,7 @@ const REVERT_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 const searchSchema = z.object({
   omitidas: z.coerce.number().int().min(0).max(100000).optional().catch(undefined),
-  plantilla: z.enum(["trade_republic", "binance"]).optional().catch(undefined),
+  plantilla: z.enum(["trade_republic", "binance", "etoro"]).optional().catch(undefined),
   sinverificar: z.literal("1").optional().catch(undefined),
 });
 

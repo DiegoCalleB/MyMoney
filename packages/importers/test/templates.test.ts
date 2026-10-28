@@ -10,6 +10,7 @@ import {
   toHex,
   type EntityTemplate,
 } from "../src";
+import { xlsx } from "./helpers/zip";
 
 const bytes = (text: string) => new TextEncoder().encode(text);
 const input = (text: string, currency: "EUR" | "USD" = "EUR") => ({
@@ -216,5 +217,131 @@ describe("analyzeStatement", () => {
       BINANCE,
     ]);
     expect(a.rows[0]?.description).toBe("");
+  });
+});
+
+describe("hojas de cálculo (.xlsx)", () => {
+  const col = (i: number) => String.fromCharCode(65 + i);
+  /** Hoja con celdas de texto; un número se escribe como número (p. ej., una fecha de serie). */
+  const sheetXml = (rows: (string | number)[][]) =>
+    rows
+      .map(
+        (row, r) =>
+          `<row r="${String(r + 1)}">${row
+            .map((v, c) => {
+              const ref = `${col(c)}${String(r + 1)}`;
+              return typeof v === "number"
+                ? `<c r="${ref}"><v>${String(v)}</v></c>`
+                : `<c r="${ref}" t="inlineStr"><is><t>${v}</t></is></c>`;
+            })
+            .join("")}</row>`,
+      )
+      .join("");
+  const header = ["Date", "Account Balance", "Type", "Details", "Position ID", "Amount"];
+  // Datos inventados con la forma descrita para la hoja «Account Activity».
+  const activity = [
+    header,
+    ["01/10/2026 10:00:00", "1000", "Deposit", "Ingreso", "", "1000.00"],
+    [45962.5, "900", "Withdraw Request", "Retirada", "", "-100.00"],
+    ["03/10/2026 09:00:00", "905", "Dividend", "Empresa Ficticia", "123", "5.25"],
+    ["04/10/2026 09:00:00", "905", "Open Position", "Compra", "124", "-200.00"],
+    ["05/10/2026 09:00:00", "905", "Deposit", "Fecha mala", "", "abc"],
+  ];
+  const analyze = (
+    bytes: Uint8Array,
+    mapping?: Parameters<typeof analyzeStatement>[0]["mapping"],
+  ) => {
+    const r = analyzeStatement(
+      { bytes, accountId: "acc-1", currency: "USD", ...(mapping ? { mapping } : {}) },
+      ENTITY_TEMPLATES,
+    );
+    if (!r.ok) throw new Error(r.error.code);
+    return r.value;
+  };
+  const book = (sheets: { name: string; rows: (string | number)[][] }[]) =>
+    xlsx({ sheets: sheets.map((s) => ({ name: s.name, xml: sheetXml(s.rows) })) });
+
+  it("aplica la plantilla de eToro a su hoja, con fechas de texto y de serie", () => {
+    const a = analyze(
+      book([
+        { name: "Account Summary", rows: [["Resumen"], ["x"]] },
+        { name: "Account Activity", rows: activity },
+      ]),
+    );
+    expect(a.template).toEqual({ id: "etoro", label: "eToro", verified: false });
+    expect(a.delimiter).toBeNull();
+    expect(a.rows.map((r) => [r.kind, r.date, r.amount.minor])).toEqual([
+      ["contribution", "2026-10-01", 100000n],
+      ["withdrawal", "2025-11-01", -10000n],
+      ["dividend", "2026-10-03", 525n],
+    ]);
+    expect(a.skipped).toBe(1);
+    expect(a.errors).toEqual([{ index: 5, code: "row.amount_invalid" }]);
+    expect(a.rows[0]?.description).toBe("Ingreso");
+  });
+
+  it("sin una hoja de plantilla cae al detector genérico en la primera hoja", () => {
+    const a = analyze(
+      book([
+        {
+          name: "Movimientos",
+          rows: [
+            ["Fecha", "Concepto", "Importe"],
+            ["27/10/2026", "Café", "-3,00"],
+          ],
+        },
+      ]),
+    );
+    expect(a.template).toBeNull();
+    expect(a.delimiter).toBeNull();
+    expect(a.rows.map((r) => r.amount.minor)).toEqual([-300n]);
+  });
+
+  it("la hoja de la plantilla sin las columnas esperadas no se usa", () => {
+    const a = analyze(
+      book([
+        {
+          name: "Account Activity",
+          rows: [
+            ["Fecha", "Concepto", "Importe"],
+            ["27/10/2026", "Café", "-3,00"],
+          ],
+        },
+      ]),
+    );
+    expect(a.template).toBeNull();
+    expect(a.rows).toHaveLength(1);
+  });
+
+  it("con un mapeo elegido a mano no aplica plantillas", () => {
+    const a = analyze(book([{ name: "Account Activity", rows: activity }]), {
+      dateColumn: 0,
+      dateFormat: "dmy",
+      descriptionColumn: 3,
+      amount: { kind: "single", column: 5 },
+      balanceColumn: null,
+      numberFormat: "en",
+    });
+    expect(a.template).toBeNull();
+  });
+
+  it("un archivo ZIP que no es un Excel válido falla con el código del lector", () => {
+    const result = analyzeStatement(
+      { bytes: Uint8Array.of(0x50, 0x4b, 0x03, 0x04, 1, 2, 3), accountId: "a", currency: "USD" },
+      ENTITY_TEMPLATES,
+    );
+    expect(!result.ok && result.error.code).toBe("xlsx.invalid_zip");
+  });
+
+  it("una hoja sin datos no es válida", () => {
+    const result = analyzeStatement(
+      {
+        bytes: book([{ name: "Account Activity", rows: [header] }]),
+        accountId: "a",
+        currency: "USD",
+      },
+      ENTITY_TEMPLATES,
+    );
+    expect(!result.ok && result.error.code).toBe("import.no_data");
   });
 });

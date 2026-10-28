@@ -62,7 +62,7 @@ export function ImportForm({
           id="file"
           name="file"
           type="file"
-          accept=".csv,text/csv"
+          accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           required
           aria-invalid={errors?.file ? "true" : undefined}
           aria-describedby={errors?.file ? "file-hint file-error" : "file-hint"}

@@ -6,6 +6,7 @@ import {
   MAX_FILE_BYTES,
   analyzeStatement,
   commitPayload,
+  looksLikeXlsx,
   previewPayload,
   toHex,
 } from "@mymoney/importers";
@@ -21,6 +22,7 @@ import { loadAccountOptions, loadSpace } from "@/server/queries/home";
 import { calendarDateInZone } from "@/lib/dates";
 
 const BUCKET = "imports";
+const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
 /** Código del análisis a texto del catálogo; lo desconocido es un error genérico de lectura. */
 function analysisMessage(code: string): string {
@@ -49,7 +51,7 @@ export async function previewImportAction(
     return { fieldErrors: { file: "import.file_missing" } };
   }
   if (file.size > MAX_FILE_BYTES) return { fieldErrors: { file: "import.file_too_large" } };
-  if (!/\.csv$/i.test(file.name)) return { fieldErrors: { file: "import.file_not_csv" } };
+  if (!/\.(csv|xlsx)$/i.test(file.name)) return { fieldErrors: { file: "import.file_not_csv" } };
 
   const space = await loadSpace(supabase, spaceId);
   if (!space) return { error: "import.failed" };
@@ -69,12 +71,15 @@ export async function previewImportAction(
   );
   if (!analysis.ok) return { fieldErrors: { file: analysisMessage(analysis.error.code) } };
   const fileHex = toHex(analysis.value.fileSha256);
+  // El tipo lo decide el contenido, no el nombre: un .csv que es un ZIP se trata como Excel.
+  const kind = looksLikeXlsx(bytes) ? "xlsx" : "csv";
 
   // Una ruta por espacio, cuenta y archivo: dos cuentas con el mismo archivo no comparten original.
-  const path = `${spaceId}/${accountId}-${fileHex}.csv`;
-  const uploaded = await supabase.storage
-    .from(BUCKET)
-    .upload(path, bytes, { contentType: "text/csv", upsert: true });
+  const path = `${spaceId}/${accountId}-${fileHex}.${kind}`;
+  const uploaded = await supabase.storage.from(BUCKET).upload(path, bytes, {
+    contentType: kind === "xlsx" ? XLSX_MIME : "text/csv",
+    upsert: true,
+  });
   if (uploaded.error) {
     logger.warn("import.upload_failed", { spaceId });
     return { error: "import.failed" };
@@ -83,7 +88,7 @@ export async function previewImportAction(
   const preview = await supabase.rpc("import_preview", {
     p_space_id: spaceId,
     p_account_id: accountId,
-    p_file_kind: "csv",
+    p_file_kind: kind,
     p_file_sha256: `\\x${fileHex}`,
     p_storage_path: path,
     p_rows: previewPayload(analysis.value, accountId),

@@ -1,6 +1,7 @@
 import { calendarDate, isCalendarDate, type CalendarDate } from "@mymoney/finance-core";
 
-export type DateFormat = "dmy" | "ymd";
+/** `serial`: número de serie de Excel. `dmy_serial`: serie si la celda es un número, día-mes-año si es texto. */
+export type DateFormat = "dmy" | "ymd" | "serial" | "dmy_serial";
 /** "es": 1.234,56. "en": 1,234.56. */
 export type NumberFormat = "es" | "en";
 
@@ -148,8 +149,24 @@ export function isValidMapping(mapping: ColumnMapping, columnCount: number): boo
   return indexes.every((i) => Number.isInteger(i) && i >= 0 && i < columnCount);
 }
 
+/** Fecha de calendario de un número de serie de Excel (días desde 1899-12-30; la hora se ignora). */
+function parseSerialDate(text: string): CalendarDate | null {
+  const match = /^(\d{1,7})(?:\.\d+)?$/.exec(text.trim());
+  if (!match) return null;
+  const days = Number(match[1]);
+  // 1 = 1900-01-01 … 2958465 = 9999-12-31 (el 29-02-1900 inexistente de Excel no se admite).
+  if (days < 61 || days > 2_958_465) return null;
+  const date = new Date(Date.UTC(1899, 11, 30) + days * 86_400_000).toISOString().slice(0, 10);
+  // Todo día entre 61 y 2958465 es una fecha de calendario válida.
+  return calendarDate(date);
+}
+
 /** Fecha de una celda ("27/10/2026", "2026-10-27", con o sin hora). Años de dos cifras: no. */
 export function parseDateCell(text: string, format: DateFormat): CalendarDate | null {
+  if (format === "serial") return parseSerialDate(text);
+  if (format === "dmy_serial") {
+    return /^\d+(?:\.\d+)?$/.test(text.trim()) ? parseSerialDate(text) : parseDateCell(text, "dmy");
+  }
   const match =
     format === "ymd"
       ? /^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})(?:[\sT].*)?$/.exec(text.trim())

@@ -7,3 +7,4 @@ export * from "./analyze";
 export * from "./payloads";
 export * from "./templates";
 export * from "./entities";
+export * from "./xlsx";

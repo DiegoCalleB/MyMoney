@@ -59,4 +59,31 @@ export const BINANCE: EntityTemplate = {
   currencyColumn: "coin",
 };
 
-export const ENTITY_TEMPLATES: readonly EntityTemplate[] = [TRADE_REPUBLIC, BINANCE];
+/**
+ * eToro: extracto de cuenta en .xlsx, hoja «Account Activity». Las cuentas de eToro suelen estar en
+ * dólares: la cuenta de MyMoney debe tener esa moneda (el archivo no trae columna de moneda).
+ */
+export const ETORO: EntityTemplate = {
+  id: "etoro",
+  label: "eToro",
+  sheet: "Account Activity",
+  verified: false,
+  requiredHeaders: ["date", "type", "details", "amount"],
+  dateColumn: "date",
+  dateFormat: "dmy_serial",
+  amountColumn: "amount",
+  numberFormat: "en",
+  kindColumn: "type",
+  kinds: {
+    deposit: "contribution",
+    "withdraw request": "withdrawal",
+    dividend: "dividend",
+  },
+  // Abrir y cerrar posiciones, comisiones y otras líneas no son flujos con el exterior.
+  unknownKind: "skip",
+  descriptionColumns: ["details"],
+  idColumn: null,
+  currencyColumn: null,
+};
+
+export const ENTITY_TEMPLATES: readonly EntityTemplate[] = [TRADE_REPUBLIC, BINANCE, ETORO];

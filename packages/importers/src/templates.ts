@@ -8,7 +8,7 @@ import {
   type Result,
 } from "@mymoney/finance-core";
 import type { Analysis, AnalyzeInput } from "./analyze";
-import { analyzeCsv, MAX_FILE_BYTES } from "./analyze";
+import { analyzeCsv, analyzeRows, MAX_FILE_BYTES } from "./analyze";
 import {
   cleanAmount,
   normalizeText,
@@ -17,6 +17,7 @@ import {
   type NumberFormat,
 } from "./columns";
 import { decodeText, parseCsv } from "./csv";
+import { looksLikeXlsx, readXlsx } from "./xlsx";
 import { fileSha256, fingerprintRows } from "./fingerprint";
 import { cleanDescription, type FlowKind, type NormalizedRow, type RowError } from "./rows";
 
@@ -32,6 +33,8 @@ export type KindRule = FlowKind | "skip";
 export interface EntityTemplate {
   readonly id: string;
   readonly label: string;
+  /** Hoja de cálculo (.xlsx) de la que se lee, si el formato es una hoja con ese nombre. */
+  readonly sheet?: string;
   /** false hasta contrastar el formato con un archivo real: la interfaz lo avisa. */
   readonly verified: boolean;
   /** Columnas que deben estar en la cabecera (comparadas sin tildes ni mayúsculas). */
@@ -213,15 +216,38 @@ function applyTemplate(
   });
 }
 
+/** Hoja de cálculo: la plantilla cuya hoja y cabecera encajan, o el detector genérico en la primera hoja. */
+function analyzeWorkbook(
+  input: AnalyzeInput,
+  templates: readonly EntityTemplate[],
+): Result<Analysis, DomainError> {
+  const hash = fileSha256(input.bytes);
+  if (!input.mapping) {
+    for (const template of templates) {
+      if (template.sheet === undefined) continue;
+      const book = readXlsx(input.bytes, template.sheet);
+      const rows = book.ok ? book.value.sheet.rows : [];
+      if (rows[0] && matchTemplate(rows[0], [template])) {
+        return applyTemplate(rows, template, input, hash, null);
+      }
+    }
+  }
+  const first = readXlsx(input.bytes);
+  if (!first.ok) return first;
+  return analyzeRows(first.value.sheet.rows, null, input);
+}
+
 /**
- * Analiza un extracto: si la cabecera corresponde a una plantilla de entidad la aplica y, si no,
- * usa el detector genérico de columnas. Mismos límites y mismos códigos de error en ambos casos.
+ * Analiza un extracto (CSV o .xlsx): si la cabecera corresponde a una plantilla de entidad la
+ * aplica y, si no, usa el detector genérico de columnas. Mismos límites y mismos códigos de error
+ * en ambos casos.
  */
 export function analyzeStatement(
   input: AnalyzeInput,
   templates: readonly EntityTemplate[],
 ): Result<Analysis, DomainError> {
   if (input.bytes.length > MAX_FILE_BYTES) return err({ code: "import.file_too_large" });
+  if (looksLikeXlsx(input.bytes)) return analyzeWorkbook(input, templates);
   const table = parseCsv(decodeText(input.bytes));
   if (!table.ok) return table;
   // parseCsv devuelve error si el archivo está vacío, así que siempre hay cabecera.
