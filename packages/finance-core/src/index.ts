@@ -7,3 +7,4 @@ export * from "./net-worth";
 export * from "./amount-input";
 export * from "./returns";
 export * from "./advice";
+export * from "./performance";

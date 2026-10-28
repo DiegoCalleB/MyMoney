@@ -99,3 +99,16 @@ a {
   text-shadow: 0 0 10px var(--text);
   user-select: none;
 }
+
+/* Modo privado: las gráficas con importes se ocultan y se muestra una nota. */
+[data-privacy="hidden"] .amount-chart {
+  display: none;
+}
+
+.privacy-note {
+  display: none;
+}
+
+[data-privacy="hidden"] .privacy-note {
+  display: block;
+}

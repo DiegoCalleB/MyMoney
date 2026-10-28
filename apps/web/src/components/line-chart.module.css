@@ -1,0 +1,45 @@
+.figure {
+  margin: var(--space-3) 0 0;
+}
+
+.svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.grid {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.zero {
+  stroke: var(--text-muted);
+  stroke-width: 1.5;
+}
+
+.tick {
+  fill: var(--text-muted);
+  font-size: 11px;
+}
+
+.main {
+  stroke: var(--accent);
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+}
+
+/* Discontinua: se distingue sin depender del color. */
+.muted {
+  stroke: var(--text-muted);
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  color: var(--text-muted);
+  margin-top: var(--space-2);
+}

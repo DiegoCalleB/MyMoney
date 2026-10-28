@@ -203,6 +203,11 @@ export default async function HomePage({ params }: { params: Promise<{ spaceId: 
                 </li>
               ) : null}
             </ul>
+            <p className={styles.links}>
+              <Link className={styles.secondary} href={`/s/${spaceId}/rentabilidad`}>
+                {t("perf.link")}
+              </Link>
+            </p>
             <details className={shell.explain}>
               <summary>{t("returns.explain.summary")}</summary>
               <p>{t("returns.explain.body")}</p>
