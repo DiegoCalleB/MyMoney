@@ -214,3 +214,12 @@
 .amountCol {
   text-align: right;
 }
+
+.monthNav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}

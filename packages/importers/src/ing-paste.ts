@@ -222,25 +222,103 @@ export function analyzeIngPaste(
   });
 }
 
+/** Categorías de ING que son ingresos; el resto son gastos (o reembolsos, si el importe es positivo). */
+const INCOME_CATEGORIES = new Set<string>([
+  "Nómina o Pensión",
+  "Otros ingresos (otros)",
+  "Ingresos de otras entidades",
+  "Ingreso Bizum",
+]);
+
+export interface CategoryChoice {
+  readonly name: string;
+  readonly kind: "income" | "expense";
+  /** Solo se usa si la categoría no existe y hay que crearla. */
+  readonly essential: boolean;
+}
+
+/** Categoría de ING → categoría de MyMoney (las que se crean por defecto en cada hogar y tres más). */
+const CATEGORY_MAP: Readonly<Record<string, { name: string; essential: boolean; income?: true }>> =
+  {
+    "Supermercados y alimentación": { name: "Alimentación", essential: true },
+    "Farmacia, herbolario y nutrición": { name: "Salud", essential: true },
+    "Dentista, médico": { name: "Salud", essential: true },
+    "Luz y gas": { name: "Suministros", essential: true },
+    Agua: { name: "Suministros", essential: true },
+    "Teléfono, TV e internet": { name: "Suministros", essential: true },
+    "Gasolina y combustible": { name: "Transporte", essential: true },
+    "Taxis y Carsharing": { name: "Transporte", essential: true },
+    "Parking y garaje": { name: "Transporte", essential: true },
+    "Mantenimiento de vehículo": { name: "Transporte", essential: true },
+    Educación: { name: "Educación y cuidado de hijos", essential: true },
+    "Pago de impuestos": { name: "Impuestos y tasas", essential: true },
+    "Decoración y mobiliario": { name: "Hogar y reparaciones", essential: false },
+    "Mantenimiento del hogar": { name: "Hogar y reparaciones", essential: false },
+    "Cafeterías y restaurantes": { name: "Restaurantes y ocio", essential: false },
+    "Cine, teatro y espectáculos": { name: "Restaurantes y ocio", essential: false },
+    "Ocio y viajes (otros)": { name: "Restaurantes y ocio", essential: false },
+    "Deporte y gimnasio": { name: "Deporte y gimnasio", essential: false },
+    "Compras (otros)": { name: "Ropa y compras", essential: false },
+    "Ropa y complementos": { name: "Ropa y compras", essential: false },
+    Electrónica: { name: "Ropa y compras", essential: false },
+    "Libros, música y videojuegos": { name: "Suscripciones", essential: false },
+    "Regalos y juguetes": { name: "Regalos", essential: false },
+    "Belleza, peluquería y perfumería": { name: "Cuidado personal", essential: false },
+    "Gasto Bizum": { name: "Otros gastos", essential: false },
+    Transferencias: { name: "Otros gastos", essential: false },
+    "Nómina o Pensión": { name: "Nómina", essential: false, income: true },
+    "Otros ingresos (otros)": { name: "Otros ingresos", essential: false, income: true },
+    "Ingresos de otras entidades": { name: "Otros ingresos", essential: false, income: true },
+    "Ingreso Bizum": { name: "Otros ingresos", essential: false, income: true },
+  };
+
 /**
- * Carga útil para `import_commit`: un movimiento por fila (ingreso o gasto sin categoría). Con
- * `only` se limita a esas filas, las que la vista previa marcó como nuevas.
+ * Tipo del movimiento: ingreso si entra dinero y la categoría es de ingresos (o no hay); todo lo
+ * demás es gasto, incluido un reembolso (gasto con importe positivo, que resta de su categoría).
+ */
+export function ingKind(entry: IngEntry): "income" | "expense" {
+  const incomeLike = entry.category === null || INCOME_CATEGORIES.has(entry.category);
+  return entry.amount.minor > 0n && incomeLike ? "income" : "expense";
+}
+
+/** Categoría de MyMoney que le corresponde; sin categoría de ING, «Otros gastos» u «Otros ingresos». */
+export function ingCategory(entry: IngEntry): CategoryChoice {
+  const kind = ingKind(entry);
+  const mapped = CATEGORY_MAP[entry.category ?? ""];
+  if (mapped && (kind === "income") === (mapped.income === true)) {
+    return { name: mapped.name, kind, essential: mapped.essential };
+  }
+  return { name: kind === "income" ? "Otros ingresos" : "Otros gastos", kind, essential: false };
+}
+
+/** Clave para buscar una categoría por tipo y nombre. */
+export function categoryKey(choice: Pick<CategoryChoice, "kind" | "name">): string {
+  return `${choice.kind}|${choice.name}`;
+}
+
+/**
+ * Carga útil para `import_commit`: un movimiento por fila, con su tipo y, si se conoce el `id` de
+ * su categoría (`categoryIds`, por tipo y nombre), la categoría en la pata externa. Con `only` se
+ * limita a esas filas, las que la vista previa marcó como nuevas.
  */
 export function ingImportTransactions(
   rows: readonly IngEntry[],
   accountId: string,
   only?: ReadonlySet<number>,
+  categoryIds?: ReadonlyMap<string, string>,
 ) {
   return rows
     .filter((row) => only === undefined || only.has(row.index))
     .map((row) => {
       const payload = toTransactionPayload(row, accountId);
+      const categoryId = categoryIds?.get(categoryKey(ingCategory(row)));
+      const [cash, external] = payload.legs;
       return {
         row_index: row.index,
-        kind: payload.kind,
+        kind: ingKind(row),
         occurred_on: payload.occurredOn,
         description: payload.description,
-        legs: payload.legs,
+        legs: [cash, categoryId ? { ...external, category_id: categoryId } : external],
       };
     });
 }

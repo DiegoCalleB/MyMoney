@@ -1,7 +1,7 @@
 -- ADR-0008 / ADR-0021: vista previa, confirmación atómica, saldo inicial, reversión y descarte de
 -- una importación; permisos y aislamiento entre espacios.
 begin;
-select plan(77);
+select plan(84);
 
 select tests.create_user('alicia@example.test') as alicia \gset
 select tests.create_user('vic@example.test') as vic \gset
@@ -20,7 +20,11 @@ as $$
       jsonb_build_object('role', 'external', 'account_id', null, 'amount_minor',
         coalesce(p_ext, (-p_cash::bigint)::text), 'currency', 'EUR')))
 $$;
-grant execute on function tests.fp(int), tests.tx(int, text, text, uuid, text, text) to authenticated, anon;
+-- Igual que tests.tx, con categoría en la pata externa.
+create function tests.txc(p_row int, p_kind text, p_on text, p_acc uuid, p_cash text, p_cat uuid)
+returns jsonb language sql
+as $$ select jsonb_set(tests.tx(p_row, p_kind, p_on, p_acc, p_cash), '{legs,1,category_id}', to_jsonb(p_cat::text)) $$;
+grant execute on function tests.fp(int), tests.tx(int, text, text, uuid, text, text), tests.txc(int, text, text, uuid, text, uuid) to authenticated, anon;
 
 select tests.authenticate_as(:'alicia');
 select public.create_space('A') as sp \gset
@@ -101,8 +105,18 @@ select throws_ok(format($$select public.import_commit(%L, %L::jsonb)$$, :'b1',
   jsonb_build_array(tests.tx(1, 'buy', '2026-10-26', :'acc', '-300'))), '22023', null, 'solo se importan ingresos y gastos');
 select throws_ok(format($$select public.import_commit(%L, %L::jsonb)$$, :'b1',
   jsonb_build_array(tests.tx(1, 'income', '2026-10-26', :'acc', '-300'))), '22023', null, 'un ingreso no puede restar del efectivo');
+insert into public.categories (space_id, name, kind) values (:'sp', 'Comida', 'expense') returning id as cat_e \gset
+insert into public.categories (space_id, name, kind) values (:'sp', 'Sueldo', 'income') returning id as cat_i \gset
+select tests.authenticate_as(:'beto');
+insert into public.categories (space_id, name, kind) values (:'sp_b', 'Ajena', 'expense') returning id as cat_x \gset
+select tests.authenticate_as(:'alicia');
 select throws_ok(format($$select public.import_commit(%L, %L::jsonb)$$, :'b1',
-  jsonb_build_array(tests.tx(1, 'expense', '2026-10-26', :'acc', '300'))), '22023', null, 'un gasto no puede sumar al efectivo');
+  jsonb_build_array(tests.txc(1, 'expense', '2026-10-26', :'acc', '-300', :'cat_i'))), '22023', null, 'la categoría debe ser del mismo tipo que el movimiento');
+select throws_ok(format($$select public.import_commit(%L, %L::jsonb)$$, :'b1',
+  jsonb_build_array(tests.txc(1, 'expense', '2026-10-26', :'acc', '-300', :'cat_x'))), '22023', null, 'una categoría de otro espacio se rechaza');
+select throws_ok(format($$select public.import_commit(%L, %L::jsonb)$$, :'b1',
+  jsonb_build_array(jsonb_set(tests.tx(1, 'expense', '2026-10-26', :'acc', '-300'), '{legs,0,category_id}', to_jsonb(:'cat_e'::text)))),
+  '22023', null, 'la categoría no puede ir en la pata de efectivo');
 select throws_ok(format($$select public.import_commit(%L, %L::jsonb)$$, :'b1',
   jsonb_build_array(tests.tx(1, 'expense', '2026-10-26', :'acc', '-300', '299'))), '22023', null, 'las patas deben cuadrar');
 select throws_ok(format($$select public.import_commit(%L, %L::jsonb)$$, :'b1',
@@ -226,6 +240,23 @@ select is((select count(*)::int from public.import_rows where batch_id = :'by'::
 -- Un descarte limpia el lote y sus filas
 select lives_ok(format($$select public.import_discard(%L)$$, :'by'), 'se descarta la vista previa conflictiva');
 select is((select count(*)::int from public.import_rows where batch_id = :'by'::uuid), 0, 'sus filas se borran en cascada');
+
+-- ---------------------------------------------------------------------------
+-- Categorías y reembolsos
+-- ---------------------------------------------------------------------------
+select (public.import_preview(:'sp', :'acc', 'csv', decode(repeat('c1', 32), 'hex'), null,
+  jsonb_build_array(jsonb_build_object('row_index', 1, 'fingerprint', tests.fp(40)),
+                    jsonb_build_object('row_index', 2, 'fingerprint', tests.fp(41)),
+                    jsonb_build_object('row_index', 3, 'fingerprint', tests.fp(42)))) ->> 'batch_id') as bc \gset
+select lives_ok(format($$select public.import_commit(%L, %L::jsonb)$$, :'bc', jsonb_build_array(
+    tests.txc(1, 'expense', '2026-11-03', :'acc', '-1000', :'cat_e'),
+    tests.txc(2, 'expense', '2026-11-04', :'acc', '300', :'cat_e'),
+    tests.txc(3, 'income', '2026-11-05', :'acc', '5000', :'cat_i'))),
+  'se importan gastos, un reembolso y un ingreso con categoría');
+select is((select count(*)::int from public.transaction_legs where role = 'external' and category_id = :'cat_e'::uuid), 2, 'las patas externas llevan su categoría');
+select is((select amount_minor::int from public.category_totals(:'sp', '2026-11-01', '2026-11-30') where category_id = :'cat_e'::uuid and flow = 'expense'), 700, 'el reembolso resta del gasto de la categoría');
+select is((select amount_minor::int from public.category_totals(:'sp', '2026-11-01', '2026-11-30') where category_id = :'cat_i'::uuid and flow = 'income'), 5000, 'el ingreso suma en su categoría');
+select is((select count(*)::int from public.transaction_legs where role = 'cash' and category_id is not null), 0, 'la pata de efectivo nunca lleva categoría');
 
 select * from finish();
 rollback;
