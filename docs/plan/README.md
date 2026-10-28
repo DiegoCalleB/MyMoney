@@ -29,6 +29,7 @@
 | 13 | [13-estructura-repositorio.md](13-estructura-repositorio.md) | Estructura del monorepo y `CLAUDE.md` inicial |
 | 14 | [14-caso-de-referencia.md](14-caso-de-referencia.md) | Forma del primer hogar (sin datos reales) y requisitos que añade |
 | 15 | [15-revision-bd.md](15-revision-bd.md) | Revisión de la base de datos: hallazgos, decisiones, pruebas y rendimiento |
+| 16 | [16-integraciones.md](16-integraciones.md) | Conexiones automáticas (PSD2, APIs), cola, bóveda de credenciales y escalera de conexión por entidad |
 | — | [../adr/](../adr/) | Registros de decisiones de arquitectura (ADR) |
 
 ## Resumen ejecutivo

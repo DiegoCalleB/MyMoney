@@ -35,11 +35,13 @@ Las tablas correspondientes están en `04-modelo-datos.md`, sección "Ampliació
 
 | Entidad | Formato conocido | Prioridad |
 |---------|------------------|-----------|
-| Trade Republic | CSV oficial de transacciones desde abril de 2026, según fuentes de terceros; revisar el staking [A VERIFICAR] | Fase 1 |
-| eToro | Extracto de cuenta en .xlsx [A VERIFICAR el formato actual] | Fase 1-2 |
-| Binance | CSV del historial (tramos de 3 meses) y API de solo lectura | Fase 1-2 (CSV), fase 3 (API) |
-| ING (fondos y plan de pensiones) | Sin documentación pública de exportación encontrada; posible solo PDF [A VERIFICAR] | Manual asistida |
-| MyInvestor | Sin documentación pública encontrada [A VERIFICAR] | Manual asistida |
+| Trade Republic | CSV oficial de transacciones (Transaktionsexport) desde el 15-04-2026, confirmado por varias herramientas que lo importan; revisar el staking [A VERIFICAR]. Cuenta de efectivo, posiblemente por PSD2 [A VERIFICAR] | Fase 1 (CSV), I-5 (PSD2) |
+| eToro | Extracto de cuenta en .xlsx [A VERIFICAR el formato actual]; API pública con clave de usuario [A VERIFICAR lectura de cartera] | Fase 1-2 (XLSX), I-6 (API) |
+| Binance | CSV del historial (tramos de 3 meses) y API de solo lectura con clave Ed25519 | Fase 1-2 (CSV), I-4 (API) |
+| ING (fondos y plan de pensiones) | Sin documentación pública de exportación encontrada; posible solo PDF [A VERIFICAR]. Cuentas de efectivo por PSD2 | Manual asistida; I-5 para el efectivo |
+| MyInvestor | Sin documentación pública de exportación [A VERIFICAR]; cuenta de efectivo por PSD2 (Redsys) | Manual asistida; I-5 para el efectivo |
+
+Las vías y los pasos I-1 a I-7 están en [16-integraciones.md](16-integraciones.md).
 
 Los fondos de inversión y los planes de pensiones **no** son cuentas de pago: quedan fuera de PSD2. La conexión automática de esos productos dependería de la futura normativa europea de acceso a datos financieros (FiDA, en tramitación) [A VERIFICAR estado].
 
