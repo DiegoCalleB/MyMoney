@@ -1,6 +1,6 @@
 -- Conexiones automáticas (ADR-0022): permisos de usuarios, bóveda, cola, cubo de fichas e ingesta.
 begin;
-select plan(111);
+select plan(118);
 
 select tests.create_user('alicia@example.test') as alicia \gset
 select tests.create_user('vic@example.test') as vic \gset
@@ -91,6 +91,7 @@ select throws_ok(format($$select * from public.get_connection_secret(%L)$$, :'cn
 select throws_ok(format($$select public.activate_connection(%L)$$, :'cn'), '42501', null, 'un usuario no activa conexiones');
 select throws_ok($$select * from public.claim_sync_jobs(5)$$, '42501', null, 'un usuario no reclama trabajos');
 select throws_ok(format($$select * from public.get_connection_info(%L)$$, :'cn'), '42501', null, 'un usuario no lee la ficha del servidor');
+select throws_ok(format($$select * from public.get_connection_accounts(%L)$$, :'cn'), '42501', null, 'un usuario no lee las cuentas vinculadas desde el servidor');
 select throws_ok($$select public.schedule_due_syncs()$$, '42501', null, 'un usuario no programa sincronizaciones');
 select throws_ok(format($$select public.ingest_sync(%L, '{}'::jsonb)$$, :'cn'), '42501', null, 'un usuario no ingiere datos');
 select throws_ok($$select public.take_rate_tokens('x', 1, 1, 1)$$, '42501', null, 'un usuario no usa el cubo de fichas');
@@ -322,6 +323,26 @@ select is(public.can_manage_connection(:'cn_mfa'), false, 'con MFA activado y se
 select throws_ok(format($$select public.revoke_connection(%L)$$, :'cn_mfa'), '42501', null, 'ni revocar');
 select tests.authenticate_as(:'alicia', 'aal2');
 select is(public.can_manage_connection(:'cn_mfa'), true, 'con aal2 sí');
+
+-- ---------------------------------------------------------------------------
+-- Cuentas bancarias (PSD2): ingresos y gastos
+-- ---------------------------------------------------------------------------
+select tests.as_postgres();
+insert into public.connections (space_id, kind, provider, created_by, status) values (:'sp', 'psd2', 'enable_banking', :'alicia', 'active') returning id as cn_bank \gset
+insert into public.accounts (space_id, name, kind, currency) values (:'sp', 'Nómina', 'current', 'EUR') returning id as acc_bank \gset
+insert into public.connection_accounts (connection_id, space_id, account_id, external_ref) values (:'cn_bank', :'sp', :'acc_bank', 'uid-1');
+select tests.as_service();
+select (public.ingest_sync(:'cn_bank', jsonb_build_object('flows', jsonb_build_array(
+  tests.flow('uid-1', 'tx-1', '2026-10-01', 'income', '150000'),
+  tests.flow('uid-1', 'tx-2', '2026-10-02', 'expense', '4530')))) ->> 'new') as r_bank \gset
+select is(:'r_bank'::text, '2'::text, 'una cuenta bancaria ingiere ingresos y gastos');
+select results_eq(format($$select external_ref from public.get_connection_accounts(%L)$$, :'cn_bank'), $$values ('uid-1')$$, 'el servidor conoce las cuentas vinculadas');
+select is((select count(*)::int from public.get_connection_accounts('00000000-0000-4000-8000-000000000000')), 0, 'una conexión sin cuentas no devuelve nada');
+select tests.as_postgres();
+select is((select balance_minor::int from public.account_cash_balances(:'sp') where account_id = :'acc_bank'::uuid), 145470, 'el gasto resta y el ingreso suma');
+select results_eq(format($$select kind, source from public.transactions t join public.transaction_legs l on l.transaction_id = t.id where l.account_id = %L and l.role = 'cash' order by t.occurred_on$$, :'acc_bank'),
+  $$values ('income', 'api'), ('expense', 'api')$$, 'con sus tipos y origen api');
+select is((select count(*)::int from public.account_external_flows(:'sp') where account_id = :'acc_bank'::uuid), 0, 'y no cuentan como aportado frente a ganado');
 
 select * from finish();
 rollback;

@@ -364,6 +364,22 @@ end;
 $$;
 comment on function public.get_connection_info is 'Espacio, proveedor y estado de una conexión, para la Edge Function. Solo service_role.';
 
+-- Referencias de las cuentas del proveedor vinculadas a una conexión (la ingesta solo admite estas).
+create function public.get_connection_accounts(p_connection_id uuid)
+returns table (external_ref text)
+language plpgsql security definer set search_path = ''
+as $$
+begin
+  if (select auth.role()) is distinct from 'service_role' then
+    raise exception 'Solo el servidor puede leer las cuentas vinculadas' using errcode = 'insufficient_privilege';
+  end if;
+  return query
+    select ca.external_ref from public.connection_accounts ca
+    where ca.connection_id = p_connection_id order by ca.external_ref;
+end;
+$$;
+comment on function public.get_connection_accounts is 'external_ref de las cuentas vinculadas a la conexión. Solo service_role.';
+
 create function public.take_rate_tokens(
   p_bucket text, p_n numeric, p_capacity numeric, p_refill_per_sec numeric
 ) returns integer
@@ -528,7 +544,7 @@ begin
   if exists (
     select 1 from jsonb_to_recordset(v_flows) as f(external_ref text, id text, occurred_on date, kind text, amount_minor bigint, currency text)
     where f.external_ref is null or f.id is null or char_length(f.id) not between 1 and 100
-       or f.occurred_on is null or f.kind is null or f.kind not in ('contribution', 'withdrawal', 'dividend', 'interest')
+       or f.occurred_on is null or f.kind is null or f.kind not in ('contribution', 'withdrawal', 'dividend', 'interest', 'income', 'expense')
        or f.amount_minor is null or f.amount_minor not between 1 and 1000000000000000 or f.currency is null
   ) or exists (
     select 1 from jsonb_to_recordset(v_vals) as v(external_ref text, as_of date, value_minor bigint, currency text)
@@ -625,10 +641,10 @@ begin
     ), new_legs as (
       insert into public.transaction_legs (transaction_id, space_id, role, account_id, amount_minor, currency)
       select p.tx_id, v_c.space_id, 'cash', v_ref.account_id,
-             case when p.kind in ('withdrawal') then -p.amount_minor else p.amount_minor end, p.currency from pairs p
+             case when p.kind in ('withdrawal', 'expense') then -p.amount_minor else p.amount_minor end, p.currency from pairs p
       union all
       select p.tx_id, v_c.space_id, 'external', null,
-             case when p.kind in ('withdrawal') then p.amount_minor else -p.amount_minor end, p.currency from pairs p
+             case when p.kind in ('withdrawal', 'expense') then p.amount_minor else -p.amount_minor end, p.currency from pairs p
       returning 1
     )
     update public.import_rows r set status = 'imported', transaction_id = p.tx_id
@@ -670,7 +686,8 @@ comment on function public.ingest_sync is 'Escribe lo que trae una sincronizaci�
 revoke execute on function
   public.can_manage_connection(uuid), public.request_sync(uuid), public.revoke_connection(uuid),
   public.put_connection_secret(uuid, bytea, bytea, bytea, bytea, smallint, text),
-  public.get_connection_secret(uuid), public.get_connection_info(uuid), public.activate_connection(uuid, timestamptz),
+  public.get_connection_secret(uuid), public.get_connection_info(uuid), public.get_connection_accounts(uuid),
+  public.activate_connection(uuid, timestamptz),
   public.take_rate_tokens(text, numeric, numeric, numeric), public.claim_sync_jobs(integer),
   public.finish_sync_job(bigint, text, text, integer), public.schedule_due_syncs(),
   public.ingest_sync(uuid, jsonb)
@@ -681,7 +698,8 @@ to authenticated;
 grant execute on function
   public.revoke_connection(uuid),
   public.put_connection_secret(uuid, bytea, bytea, bytea, bytea, smallint, text),
-  public.get_connection_secret(uuid), public.get_connection_info(uuid), public.activate_connection(uuid, timestamptz),
+  public.get_connection_secret(uuid), public.get_connection_info(uuid), public.get_connection_accounts(uuid),
+  public.activate_connection(uuid, timestamptz),
   public.take_rate_tokens(text, numeric, numeric, numeric), public.claim_sync_jobs(integer),
   public.finish_sync_job(bigint, text, text, integer), public.schedule_due_syncs(),
   public.ingest_sync(uuid, jsonb)
