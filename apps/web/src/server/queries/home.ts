@@ -1,6 +1,8 @@
 import "server-only";
 import {
-  DEFAULT_ADVICE_THRESHOLDS,
+  THRESHOLD_ASSUMPTION_KEYS,
+  thresholdsFrom,
+  type AdviceThresholds,
   addDays,
   calendarDate,
   evaluateAdvice,
@@ -25,6 +27,7 @@ import {
   movementsAfterRow,
   noticeRow,
   plannedPendingRow,
+  thresholdRow,
   pocketRow,
   spaceRow,
   valuationRow,
@@ -52,6 +55,8 @@ export interface HomeData {
   /** Gasto mensual indicado por la persona (supuesto), si lo hay. */
   readonly monthlyExpense: ReturnType<typeof money> | null;
   readonly notices: readonly NoticeRow[];
+  /** Umbrales de los avisos: los de la persona (supuestos) o los valores por defecto. */
+  readonly thresholds: AdviceThresholds;
 }
 
 function check<T>(label: string, error: { code?: string } | null, data: T): T {
@@ -101,6 +106,7 @@ export async function loadHome(supabase: Supabase, spaceId: string): Promise<Hom
     flows,
     expense,
     planned,
+    thresholdRows,
   ] = await Promise.all([
     supabase
       .from("accounts")
@@ -148,6 +154,15 @@ export async function loadHome(supabase: Supabase, spaceId: string): Promise<Hom
       .eq("status", "planned")
       .lt("planned_on", today)
       .limit(200),
+    supabase
+      .from("assumptions")
+      .select("key,value,effective_from")
+      .eq("space_id", spaceId)
+      .in("key", [...THRESHOLD_ASSUMPTION_KEYS])
+      .is("person_id", null)
+      .lte("effective_from", today)
+      .order("effective_from", { ascending: false })
+      .limit(50),
   ]);
 
   const accountRows = z
@@ -208,6 +223,13 @@ export async function loadHome(supabase: Supabase, spaceId: string): Promise<Hom
   const plannedRows = z
     .array(plannedPendingRow)
     .parse(check("operaciones planificadas", planned.error, planned.data ?? []));
+  // El valor vigente de cada umbral es el de fecha más reciente (la consulta ya viene ordenada).
+  const thresholds = thresholdsFrom(
+    z
+      .array(thresholdRow)
+      .parse(check("umbrales", thresholdRows.error, thresholdRows.data ?? []))
+      .map((r) => ({ key: r.key, value: r.value })),
+  ).thresholds;
   const findings = evaluateAdvice({
     baseCurrency: space.base_currency,
     accounts: result.explanation.accounts.flatMap((line) => {
@@ -226,7 +248,7 @@ export async function loadHome(supabase: Supabase, spaceId: string): Promise<Hom
         : [];
     }),
     monthlyExpense,
-    thresholds: DEFAULT_ADVICE_THRESHOLDS,
+    thresholds,
     pockets: pocketRows.flatMap((p) => {
       const value = pocketValues.get(p.id);
       return value ? [{ pocketId: p.id, riskLevel: p.risk_level, value }] : [];
@@ -238,6 +260,7 @@ export async function loadHome(supabase: Supabase, spaceId: string): Promise<Hom
     today,
     result,
     findings,
+    thresholds,
     monthlyExpense,
     returns: buildReturns(
       flowRows,

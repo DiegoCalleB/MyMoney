@@ -56,6 +56,64 @@ export const DEFAULT_ADVICE_THRESHOLDS: AdviceThresholds = {
   runwayMaxMonths: 12,
 };
 
+/**
+ * Qué supuesto (`assumptions.key`) edita cada umbral y entre qué valores es válido. Los
+ * umbrales son de la persona (regla 19): lo que no esté definido, o no sea válido, usa el valor
+ * por defecto y se informa en `ignored`.
+ */
+export const THRESHOLD_FIELDS = {
+  speculativeShareBps: { assumptionKey: "speculative_share_bps", unit: "bps", min: 0, max: 10_000 },
+  institutionShareBps: { assumptionKey: "institution_share_bps", unit: "bps", min: 0, max: 10_000 },
+  liquidShareBps: { assumptionKey: "liquid_share_bps", unit: "bps", min: 0, max: 10_000 },
+  runwayMinMonths: { assumptionKey: "runway_min_months", unit: "months", min: 0, max: 120 },
+  runwayMaxMonths: { assumptionKey: "runway_max_months", unit: "months", min: 1, max: 600 },
+} as const satisfies Record<
+  keyof AdviceThresholds,
+  {
+    assumptionKey: string;
+    unit: "bps" | "months";
+    min: number;
+    max: number;
+  }
+>;
+
+/** Claves de `assumptions` de los umbrales de avisos. */
+export const THRESHOLD_ASSUMPTION_KEYS: readonly string[] = Object.values(THRESHOLD_FIELDS).map(
+  (f) => f.assumptionKey,
+);
+
+const WHOLE_NUMBER = /^\d{1,9}(?:\.0+)?$/;
+
+/**
+ * Umbrales a partir de los supuestos guardados (el más reciente de cada clave). Un valor que no es
+ * un entero dentro de su rango se ignora; si los meses mínimo y máximo no cuadran (mínimo ≥
+ * máximo), se ignoran los dos. Nunca lanza: los avisos siguen funcionando con los valores por defecto.
+ */
+export function thresholdsFrom(
+  assumptions: readonly { readonly key: string; readonly value: string }[],
+  defaults: AdviceThresholds = DEFAULT_ADVICE_THRESHOLDS,
+): { thresholds: AdviceThresholds; ignored: readonly string[] } {
+  const next: { -readonly [K in keyof AdviceThresholds]: number } = { ...defaults };
+  const ignored: string[] = [];
+  for (const name of Object.keys(THRESHOLD_FIELDS) as (keyof AdviceThresholds)[]) {
+    const field = THRESHOLD_FIELDS[name];
+    const row = assumptions.find((a) => a.key === field.assumptionKey);
+    if (!row) continue;
+    const value = WHOLE_NUMBER.test(row.value) ? Number(row.value.split(".")[0]) : Number.NaN;
+    if (Number.isInteger(value) && value >= field.min && value <= field.max) next[name] = value;
+    else ignored.push(field.assumptionKey);
+  }
+  if (next.runwayMinMonths >= next.runwayMaxMonths) {
+    next.runwayMinMonths = defaults.runwayMinMonths;
+    next.runwayMaxMonths = defaults.runwayMaxMonths;
+    ignored.push(
+      THRESHOLD_FIELDS.runwayMinMonths.assumptionKey,
+      THRESHOLD_FIELDS.runwayMaxMonths.assumptionKey,
+    );
+  }
+  return { thresholds: next, ignored };
+}
+
 export interface AdviceInput {
   readonly baseCurrency: CurrencyCode;
   readonly accounts: readonly AdviceAccount[];

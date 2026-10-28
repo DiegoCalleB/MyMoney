@@ -156,6 +156,23 @@ export const esES = {
   "advice.limits":
     "Los avisos informan de hechos sobre tus propios datos. No son asesoramiento financiero ni una recomendación personalizada: la decisión es siempre tuya.",
   "advice.expense_cta": "Indica tu gasto mensual para ver cuántos meses cubre tu colchón",
+  "thresholds.title": "Umbrales de tus avisos",
+  "thresholds.intro":
+    "Los avisos se calculan con estos límites, que son tuyos: cámbialos cuando quieras y verás los avisos al instante. Si no tocas nada, se usan los valores de partida que ves aquí.",
+  "thresholds.speculative.label": "Tope en bolsillos especulativos (% del patrimonio)",
+  "thresholds.speculative.hint":
+    "Se avisa cuando lo marcado como especulativo supera este porcentaje.",
+  "thresholds.institution.label": "Máximo en una sola entidad (% del patrimonio)",
+  "thresholds.institution.hint": "Se avisa cuando una entidad concentra más que esto.",
+  "thresholds.liquid.label": "Efectivo y ahorro a partir del cual se informa (% del patrimonio)",
+  "thresholds.liquid.hint": "Solo informa de la parte que tienes disponible de inmediato.",
+  "thresholds.runway_min.label": "Meses de gasto cubiertos: mínimo",
+  "thresholds.runway_min.hint": "Se avisa si tu efectivo cubre menos meses que estos.",
+  "thresholds.runway_max.label": "Meses de gasto cubiertos: máximo",
+  "thresholds.runway_max.hint": "Se informa si tu efectivo cubre más meses que estos.",
+  "thresholds.submit": "Guardar umbrales",
+  "thresholds.invalid": "Escribe un valor válido: porcentajes de 0 a 100 y meses enteros.",
+  "thresholds.runway_order": "El mínimo de meses debe ser menor que el máximo.",
   "assumptions.title": "Tus supuestos",
   "assumptions.intro":
     "Los avisos usan estos datos. Son aproximaciones tuyas y puedes cambiarlos cuando quieras.",

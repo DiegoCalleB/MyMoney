@@ -278,3 +278,9 @@ export const priceRow = z.object({
   currency,
 });
 export type PriceRow = z.infer<typeof priceRow>;
+
+/** Umbral de avisos guardado como supuesto (`assumptions`): clave y valor como texto. */
+export const thresholdRow = z.object({
+  key: z.string(),
+  value: decimalText,
+});
