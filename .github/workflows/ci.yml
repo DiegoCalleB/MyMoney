@@ -61,7 +61,7 @@ jobs:
       - name: Instalar pgTAP
         run: |
           sudo apt-get update -q
-          sudo apt-get install -y -q postgresql-16-pgtap libtap-parser-sourcehandler-pgtap
+          sudo apt-get install -y -q postgresql-16-pgtap libtap-parser-sourcehandler-pgtap-perl
       - name: Migraciones + pgTAP (RLS, invariantes, auditoría, ingresos y gastos)
         run: sudo -E bash scripts/db-test-local.sh
       - name: Verificación de seguridad sobre el catálogo (debe devolver 0 filas)
@@ -90,5 +90,5 @@ jobs:
       - name: Instalar pgTAP
         run: |
           sudo apt-get update -q
-          sudo apt-get install -y -q postgresql-16-pgtap libtap-parser-sourcehandler-pgtap
+          sudo apt-get install -y -q postgresql-16-pgtap libtap-parser-sourcehandler-pgtap-perl
       - run: sudo -E python3 scripts/db-mutation-check.py

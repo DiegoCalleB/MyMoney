@@ -12,7 +12,7 @@ if ! command -v pg_prove >/dev/null 2>&1 || ! ls /usr/share/postgresql/*/extensi
     [ "$(id -u)" != "0" ] && SUDO="sudo -n"
     PGMAJOR="$(ls /usr/lib/postgresql | sort -V | tail -1)"
     $SUDO apt-get update -q >/dev/null || true
-    $SUDO apt-get install -y -q "postgresql-${PGMAJOR}-pgtap" libtap-parser-sourcehandler-pgtap >/dev/null
+    $SUDO apt-get install -y -q "postgresql-${PGMAJOR}-pgtap" libtap-parser-sourcehandler-pgtap-perl >/dev/null
   else
     echo "Aviso: instala PostgreSQL 15+ con pgTAP y pg_prove (o usa 'supabase test db' con Docker)." >&2
   fi
