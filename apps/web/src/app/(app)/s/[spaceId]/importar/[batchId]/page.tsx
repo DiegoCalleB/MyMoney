@@ -14,15 +14,24 @@ export const metadata: Metadata = { title: t("import.preview.title") };
 
 const REVERT_WINDOW_MS = 24 * 60 * 60 * 1000;
 
+const searchSchema = z.object({
+  omitidas: z.coerce.number().int().min(0).max(100000).optional().catch(undefined),
+  plantilla: z.enum(["trade_republic", "binance"]).optional().catch(undefined),
+  sinverificar: z.literal("1").optional().catch(undefined),
+});
+
 export default async function ImportBatchPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ spaceId: string; batchId: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const ids = z.object({ spaceId: z.uuid(), batchId: z.uuid() }).safeParse(await params);
   if (!ids.success) notFound();
   const { spaceId, batchId } = ids.data;
 
+  const hints = searchSchema.parse(await searchParams);
   const { supabase } = await requireReadyUser();
   const batch = await loadBatch(supabase, spaceId, batchId);
   if (!batch) notFound();
@@ -40,6 +49,15 @@ export default async function ImportBatchPage({
       {batch.status === "previewed" ? (
         <>
           <h1 className={styles.title}>{t("import.preview.title")}</h1>
+          {hints.plantilla ? (
+            <p role="status">
+              {t("import.preview.template", { name: t(`import.template.${hints.plantilla}`) })}
+            </p>
+          ) : null}
+          {hints.sinverificar ? <p role="alert">{t("import.preview.unverified")}</p> : null}
+          {hints.omitidas ? (
+            <p>{t("import.preview.skipped", { count: String(hints.omitidas) })}</p>
+          ) : null}
           <ul>
             <li>{t("import.preview.new", { count: String(count("new")) })}</li>
             <li>{t("import.preview.duplicate", { count: String(count("duplicate")) })}</li>

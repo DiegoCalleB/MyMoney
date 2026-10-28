@@ -2,8 +2,9 @@
 
 import { isCurrencyCode } from "@mymoney/finance-core";
 import {
+  ENTITY_TEMPLATES,
   MAX_FILE_BYTES,
-  analyzeCsv,
+  analyzeStatement,
   commitPayload,
   previewPayload,
   toHex,
@@ -62,7 +63,10 @@ export async function previewImportAction(
   }
 
   const bytes = new Uint8Array(await file.arrayBuffer());
-  const analysis = analyzeCsv({ bytes, accountId, currency: account.currency });
+  const analysis = analyzeStatement(
+    { bytes, accountId, currency: account.currency },
+    ENTITY_TEMPLATES,
+  );
   if (!analysis.ok) return { fieldErrors: { file: analysisMessage(analysis.error.code) } };
   const fileHex = toHex(analysis.value.fileSha256);
 
@@ -98,7 +102,16 @@ export async function previewImportAction(
     await supabase.storage.from(BUCKET).remove([path]);
     return { error: "import.already_imported" };
   }
-  redirect(`/s/${spaceId}/importar/${result.data.batch_id}`);
+  // Lo que la plantilla dejó fuera a propósito no se guarda en la base de datos: viaja en la URL
+  // (solo un número y el id de la plantilla, nunca datos del archivo).
+  const extra = new URLSearchParams();
+  if (analysis.value.skipped > 0) extra.set("omitidas", String(analysis.value.skipped));
+  if (analysis.value.template) {
+    extra.set("plantilla", analysis.value.template.id);
+    if (!analysis.value.template.verified) extra.set("sinverificar", "1");
+  }
+  const query = extra.size > 0 ? `?${extra.toString()}` : "";
+  redirect(`/s/${spaceId}/importar/${result.data.batch_id}${query}`);
 }
 
 /**
@@ -137,7 +150,10 @@ export async function confirmImportAction(
     return { error: "import.confirm_failed" };
   }
   const bytes = new Uint8Array(await downloaded.data.arrayBuffer());
-  const analysis = analyzeCsv({ bytes, accountId: batch.account_id, currency: account.currency });
+  const analysis = analyzeStatement(
+    { bytes, accountId: batch.account_id, currency: account.currency },
+    ENTITY_TEMPLATES,
+  );
   if (!analysis.ok) return { error: "import.confirm_failed" };
   if (toHex(analysis.value.fileSha256) !== batch.file_sha256) {
     logger.warn("import.hash_mismatch", { spaceId });

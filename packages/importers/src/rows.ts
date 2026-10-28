@@ -7,6 +7,10 @@ import {
 } from "@mymoney/finance-core";
 import { cleanAmount, normalizeText, parseDateCell, type ColumnMapping } from "./columns";
 
+/** Tipos de movimiento que un extracto puede crear (los admite `import_commit`). */
+export type FlowKind =
+  "income" | "expense" | "contribution" | "withdrawal" | "dividend" | "interest";
+
 export interface NormalizedRow {
   /** Posición de la fila entre las de datos, empezando en 1 (sin cabecera ni líneas vacías). */
   readonly index: number;
@@ -17,6 +21,8 @@ export interface NormalizedRow {
   readonly amount: Money;
   /** Saldo tras el apunte, si el extracto lo trae. */
   readonly balanceAfter: Money | null;
+  /** Tipo fijado por una plantilla de entidad; sin él se deduce del signo (ingreso o gasto). */
+  readonly kind?: FlowKind;
 }
 
 export interface RowError {
@@ -29,7 +35,8 @@ export interface RowError {
     | "row.amount_ambiguous"
     | "row.amount_zero"
     | "row.amount_too_large"
-    | "row.balance_invalid";
+    | "row.balance_invalid"
+    | "row.kind_unknown";
 }
 
 export const MAX_DESCRIPTION_LENGTH = 200;

@@ -289,6 +289,14 @@ export const esES = {
   "import.preview.new": "Movimientos nuevos: {count}",
   "import.preview.duplicate": "Ya importados (se omiten): {count}",
   "import.preview.error": "Filas que no entendemos (se omiten): {count}",
+  "import.preview.template": "Reconocido como un archivo de {name}.",
+  "import.preview.unverified":
+    "Esta plantilla todavía no se ha contrastado con un archivo real: revisa bien la vista previa antes de confirmar.",
+  "import.preview.skipped":
+    "Filas que no son aportaciones, retiradas, dividendos ni intereses (compras, otras monedas…): {count}. Se omiten a propósito.",
+  "import.template.trade_republic": "Trade Republic",
+  "import.template.binance": "Binance",
+  "row.kind_unknown": "no reconocemos el tipo de operación",
   "import.preview.nothing_new": "No hay movimientos nuevos que importar.",
   "import.preview.keep_descriptions": "Guardar el concepto de cada movimiento",
   "import.preview.keep_descriptions_hint":

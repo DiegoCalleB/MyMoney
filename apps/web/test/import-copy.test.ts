@@ -19,6 +19,7 @@ const ANALYSIS_CODES = [
   "row.amount_zero",
   "row.amount_too_large",
   "row.balance_invalid",
+  "row.kind_unknown",
 ];
 
 describe("textos de la importación", () => {

@@ -33,6 +33,14 @@ export interface Analysis {
   readonly mapping: ColumnMapping;
   readonly rows: readonly AnalyzedRow[];
   readonly errors: readonly RowError[];
+  /** Filas que la plantilla de la entidad deja fuera a propósito (compras, otras monedas…). */
+  readonly skipped: number;
+  /** Plantilla de entidad aplicada, si se reconoció la cabecera. */
+  readonly template: {
+    readonly id: string;
+    readonly label: string;
+    readonly verified: boolean;
+  } | null;
   readonly summary: {
     readonly dataRows: number;
     readonly validRows: number;
@@ -72,6 +80,8 @@ export function analyzeCsv(input: AnalyzeInput): Result<Analysis, DomainError> {
     mapping,
     rows: analyzed,
     errors,
+    skipped: 0,
+    template: null,
     summary: {
       dataRows: data.length,
       validRows: rows.length,
