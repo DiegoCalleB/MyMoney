@@ -20,7 +20,9 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   // Los paquetes del monorepo se publican como TypeScript fuente.
-  transpilePackages: ["@mymoney/finance-core", "@mymoney/schemas"],
+  transpilePackages: ["@mymoney/finance-core", "@mymoney/importers", "@mymoney/schemas"],
+  // Un extracto pesa como máximo 5 MB (MAX_FILE_BYTES); el servidor lo vuelve a comprobar.
+  experimental: { serverActions: { bodySizeLimit: "6mb" } },
   headers() {
     return Promise.resolve([{ source: "/:path*", headers: securityHeaders }]);
   },
