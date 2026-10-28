@@ -4,3 +4,4 @@ export * from "./rows";
 export * from "./fingerprint";
 export * from "./legs";
 export * from "./analyze";
+export * from "./ing-paste";
