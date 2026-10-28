@@ -126,3 +126,18 @@ values ('ES', 2026, 'savings_brackets',
 ```
 
 Cada cifra mostrada en la web enseña el ejercicio, la fecha de verificación y el enlace a la fuente. Lo que el programa estima (por ejemplo, la ganancia a nivel de cuenta) aparece como estimación con sus supuestos.
+
+## Conexión bancaria PSD2 (Enable Banking) — opcional
+
+Requiere haber hecho antes «Conexiones automáticas» (migraciones, clave maestra, `sync-worker`).
+
+1. **Registrar la aplicación** en Enable Banking (panel de control, producción restringida a cuentas propias). Genera un par RSA 2048 en tu equipo, sube la clave **pública** y guarda la privada en PKCS#8 (PEM). Anota el identificador de la aplicación. No pongas ninguna de las dos en el repositorio.
+2. **Redirección permitida:** `APP_ORIGIN` + `/conexiones/retorno` (por ejemplo `https://tu-dominio/conexiones/retorno`), exactamente igual en el panel y en la configuración.
+3. **Secretos de las funciones** (`supabase secrets set`): `ENABLE_BANKING_APP_ID`, `ENABLE_BANKING_PRIVATE_KEY` (el PEM completo), `APP_ORIGIN`; opcional `ENABLE_BANKING_API_BASE`. Los lee `connect-bank` y también `sync-worker`.
+4. **Desplegar:** `supabase functions deploy connect-bank` y volver a desplegar `sync-worker --no-verify-jwt`. `connect-bank` comprueba el JWT de la persona con la base de datos (`can_manage_connection`, RLS y segundo factor).
+5. **Conectar:** `/conexiones` → «Conectar un banco». La persona da el permiso en la web de su banco, vuelve a `/conexiones/retorno` y vincula cada cuenta del banco con una de MyMoney de la misma moneda. Solo se leen las vinculadas.
+6. **Límites:** el banco permite unos 4 accesos al día sin la persona delante; el trabajador usa 3 por conexión y un cubo global. El permiso dura como máximo 180 días: al caducar, la conexión pasa a «Caducada» y hay que renovarla.
+7. **Datos:** nunca se guarda el IBAN (identificador opaco del proveedor y los últimos 4 dígitos); los conceptos se limpian de números largos y se recortan a 60 caracteres.
+
+**Qué no está probado contra el servicio real:** la forma de las respuestas de Enable Banking sale de su documentación pública [A VERIFICAR en el sandbox]. Primera prueba: conecta una cuenta de prueba, pulsa «Sincronizar ahora» y comprueba saldo y movimientos de los últimos 30 días.
+8. **Revocar:** en MyMoney borra el secreto y detiene las lecturas, pero **no** cierra el permiso en el banco; para cortarlo del todo, retíralo también desde el apartado de permisos o terceros de la app de tu banco. [A VERIFICAR si Enable Banking permite cerrar la sesión por API; si sí, se añadirá a la revocación.]

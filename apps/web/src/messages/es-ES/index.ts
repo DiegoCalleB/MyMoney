@@ -474,6 +474,7 @@ export const esES = {
     "Conecta una cuenta para que se actualice sola. Solo se leen saldos y movimientos: nunca se puede mover dinero.",
   "connections.empty": "Todavía no has conectado ninguna cuenta.",
   "connections.add_binance": "Conectar Binance",
+  "connections.add_bank": "Conectar un banco",
   "connections.provider.binance": "Binance",
   "connections.provider.etoro": "eToro",
   "connections.provider.enable_banking": "Banco (PSD2)",
@@ -516,6 +517,29 @@ export const esES = {
   "connections.binance.step3_submit": "Comprobar y conectar",
   "connections.binance.cancelled": "Esta conexión se ha cancelado. Empieza de nuevo.",
   "connections.binance.restart": "Empezar de nuevo",
+  "connections.bank.title": "Conectar un banco",
+  "connections.bank.intro":
+    "Te llevaremos a la web de tu banco para que des un permiso de solo lectura (saldo y movimientos). MyMoney nunca ve tus claves del banco ni puede mover dinero. El permiso dura como máximo 180 días y puedes retirarlo cuando quieras.",
+  "connections.bank.bank.label": "Banco",
+  "connections.bank.bank.hint": "Solo aparecen los bancos de España que admite la conexión.",
+  "connections.bank.submit": "Ir a mi banco",
+  "connections.bank.unavailable":
+    "Ahora mismo no podemos consultar la lista de bancos. Inténtalo más tarde.",
+  "connections.bank.country_invalid": "Elige un país válido.",
+  "connections.bank.bank_invalid": "Elige un banco de la lista.",
+  "connections.bank.link_title": "Vincular las cuentas del banco",
+  "connections.bank.link_intro":
+    "El banco ha dado el permiso. Elige con qué cuenta de MyMoney se corresponde cada cuenta del banco; las que no vincules no se leerán.",
+  "connections.bank.account_label": "Cuenta del banco {hint} ({currency})",
+  "connections.bank.dont_link": "No vincular",
+  "connections.bank.link_hint":
+    "Solo se ofrecen cuentas de tu hogar en la misma moneda. Se leen los movimientos de los últimos 30 días y se evitan los duplicados.",
+  "connections.bank.link_submit": "Vincular y sincronizar",
+  "connections.bank.link_invalid": "Esa combinación de cuentas no es válida. Revísala.",
+  "connections.bank.link_none": "Vincula al menos una cuenta.",
+  "connections.bank.link_failed": "No hemos podido vincular las cuentas. Inténtalo de nuevo.",
+  "connections.bank.no_bank_accounts":
+    "El banco no ha compartido ninguna cuenta. Revoca esta conexión y vuelve a empezar.",
   "connections.account_invalid": "Elige una cuenta del hogar en euros.",
   "connections.no_accounts": "Necesitas una cuenta en euros para conectarla.",
   "connections.api_key_invalid": "La clave de acceso son 64 letras y números, sin espacios.",

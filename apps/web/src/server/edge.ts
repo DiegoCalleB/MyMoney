@@ -13,20 +13,30 @@ export interface ConnectBinanceBody {
   readonly api_key?: string;
 }
 
+export interface ConnectBankBody {
+  readonly action: "banks" | "start" | "finish" | "accounts";
+  readonly connection_id?: string;
+  readonly country?: string;
+  readonly bank_name?: string;
+  readonly state?: string;
+  readonly code?: string;
+}
+
 /**
- * Llama a la Edge Function `connect-binance` con el JWT de la persona: ella decide si puede
+ * Llama a una Edge Function de conexiones con el JWT de la persona: ella decide si puede
  * gestionar la conexión (RLS y segundo factor); la clave secreta solo existe allí (regla 3). El
  * cuerpo (con la clave de acceso) no se registra y la respuesta solo se lee por su código.
  */
-export async function callConnectBinance(
+async function callEdge(
+  name: "connect-binance" | "connect-bank",
   env: PublicEnv,
   accessToken: string,
-  body: ConnectBinanceBody,
-  fetchFn: Fetch = fetch,
+  body: ConnectBinanceBody | ConnectBankBody,
+  fetchFn: Fetch,
 ): Promise<EdgeResult> {
   let response: Response;
   try {
-    response = await fetchFn(`${env.url}/functions/v1/connect-binance`, {
+    response = await fetchFn(`${env.url}/functions/v1/${name}`, {
       method: "POST",
       headers: {
         authorization: `Bearer ${accessToken}`,
@@ -54,3 +64,17 @@ export async function callConnectBinance(
   const error = typeof record.error === "string" ? record.error : "unknown";
   return { ok: false, status: response.status, error };
 }
+
+export const callConnectBinance = (
+  env: PublicEnv,
+  accessToken: string,
+  body: ConnectBinanceBody,
+  fetchFn: Fetch = fetch,
+): Promise<EdgeResult> => callEdge("connect-binance", env, accessToken, body, fetchFn);
+
+export const callConnectBank = (
+  env: PublicEnv,
+  accessToken: string,
+  body: ConnectBankBody,
+  fetchFn: Fetch = fetch,
+): Promise<EdgeResult> => callEdge("connect-bank", env, accessToken, body, fetchFn);

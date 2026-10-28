@@ -111,6 +111,9 @@ export default async function ConnectionsPage({
       )}
       <p className={shell.muted}>{t("connections.revoke_note")}</p>
       <p className={styles.links}>
+        <Link className={styles.primary} href={`/s/${space.id}/conexiones/banco`}>
+          {t("connections.add_bank")}
+        </Link>
         <Link className={styles.primary} href={`/s/${space.id}/conexiones/binance`}>
           {t("connections.add_binance")}
         </Link>

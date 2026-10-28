@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { isMessageKey } from "@/lib/i18n";
 import {
+  bankAccount,
+  bankList,
+  bankReturn,
   connectionAttentionKey,
+  connectionIdFromState,
   connectionRow,
   edgeErrorCancels,
   edgeErrorKey,
@@ -108,4 +112,43 @@ describe("callConnectBinance", () => {
     );
     expect(noCode).toEqual({ ok: false, status: 400, error: "unknown" });
   });
+});
+
+describe("vuelta del banco", () => {
+  const state = `${ID}.${"a".repeat(32)}`;
+
+  it("acepta un code y un state con el formato esperado y saca la conexión del state", () => {
+    const parsed = bankReturn.parse({ code: "abc-DEF_1.2~3", state });
+    expect(connectionIdFromState(parsed.state)).toBe(ID);
+  });
+
+  it.each([
+    { code: "", state },
+    { code: "con espacios", state },
+    { code: "x".repeat(513), state },
+    { code: "ok", state: "basura" },
+    { code: "ok", state: `${ID}.${"A".repeat(32)}` },
+    { code: "ok", state: `${ID}.${"a".repeat(31)}` },
+  ])("rechaza %j", (input) => {
+    expect(bankReturn.safeParse(input).success).toBe(false);
+  });
+
+  it("valida la lista de bancos y las cuentas ofrecidas", () => {
+    expect(bankList.safeParse({ banks: [{ name: "Banco Ficticio", country: "ES" }] }).success).toBe(
+      true,
+    );
+    expect(bankList.safeParse({ banks: [{ name: "", country: "ES" }] }).success).toBe(false);
+    expect(bankAccount.safeParse({ uid: "u1", hint: "••••1332", currency: "EUR" }).success).toBe(
+      true,
+    );
+    expect(bankAccount.safeParse({ uid: "", hint: "", currency: "EUR" }).success).toBe(false);
+  });
+
+  it.each(["provider_failed", "state_mismatch", "state_expired", "no_session"])(
+    "traduce el error %s a un texto del catálogo",
+    (code) => {
+      expect(isMessageKey(edgeErrorKey(code))).toBe(true);
+      expect(edgeErrorKey(code)).not.toBe("connections.error.failed");
+    },
+  );
 });

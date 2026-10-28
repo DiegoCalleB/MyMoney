@@ -36,7 +36,34 @@ const EDGE_ERRORS: Readonly<Record<string, string>> = {
   no_key_pair: "connections.error.state",
   secret_unreadable: "connections.error.state",
   provider_unreachable: "connections.error.provider_unreachable",
+  provider_failed: "connections.error.provider_unreachable",
+  state_mismatch: "connections.error.state",
+  state_expired: "connections.error.state",
+  no_session: "connections.error.state",
 };
+
+/** Cuenta del banco tal como la devuelve la función: identificador opaco, pista y moneda. */
+export const bankAccount = z.object({
+  uid: z.string().min(1).max(100),
+  hint: z.string().max(20),
+  currency: z.string().max(3),
+});
+export type BankAccount = z.infer<typeof bankAccount>;
+
+export const bankList = z.object({
+  banks: z.array(z.object({ name: z.string().min(1).max(100), country: z.string().length(2) })),
+});
+
+/** Parámetros con los que el banco vuelve a la aplicación: el state lleva el id de la conexión. */
+export const bankReturn = z.object({
+  code: z.string().regex(/^[A-Za-z0-9._~:-]{1,512}$/),
+  state: z.string().regex(/^[0-9a-f-]{36}\.[0-9a-f]{32}$/),
+});
+
+/** Id de la conexión contenido en el `state` (ya validado con `bankReturn`). */
+export function connectionIdFromState(state: string): string {
+  return state.slice(0, 36);
+}
 
 export function edgeErrorKey(code: string): string {
   return EDGE_ERRORS[code] ?? "connections.error.failed";

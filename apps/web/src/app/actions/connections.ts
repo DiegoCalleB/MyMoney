@@ -1,6 +1,12 @@
 "use server";
 
-import { connectionActionInput, finishBinanceInput, startBinanceInput } from "@mymoney/schemas";
+import {
+  connectionActionInput,
+  finishBinanceInput,
+  linkBankInput,
+  startBankInput,
+  startBinanceInput,
+} from "@mymoney/schemas";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { fieldErrorsFrom, formText, type FormState } from "@/components/form-state";
@@ -8,8 +14,8 @@ import { calendarDateInZone } from "@/lib/dates";
 import { readPublicEnv } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { requireReadyUser } from "@/server/auth";
-import { edgeErrorCancels, edgeErrorKey } from "@/server/connections-model";
-import { callConnectBinance } from "@/server/edge";
+import { bankAccount, edgeErrorCancels, edgeErrorKey } from "@/server/connections-model";
+import { callConnectBank, callConnectBinance } from "@/server/edge";
 import { loadAccountOptions, loadSpace } from "@/server/queries/home";
 
 /** Estado del asistente de Binance: la clave PÚBLICA es lo único que se enseña. */
@@ -173,4 +179,116 @@ export async function revokeConnectionAction(formData: FormData): Promise<void> 
   const result = await supabase.rpc("revoke_connection", { p_connection_id: connectionId });
   if (result.error) logger.warn("connection.revoke_failed", { code: result.error.code, spaceId });
   redirect(`/s/${spaceId}/conexiones`);
+}
+
+/**
+ * Paso 1 del banco (PSD2): crea la conexión pendiente y lleva a la persona a la web de su banco
+ * para que dé el permiso de solo lectura. Al volver, `/conexiones/retorno` lo cierra.
+ */
+export async function startBankAction(
+  _previous: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const { supabase, userId } = await requireReadyUser();
+  const parsed = startBankInput.safeParse({
+    spaceId: formText(formData, "spaceId"),
+    country: formText(formData, "country"),
+    bank: formText(formData, "bank"),
+  });
+  if (!parsed.success) return fieldErrorsFrom(parsed.error);
+  const { spaceId, country, bank } = parsed.data;
+  const space = await loadSpace(supabase, spaceId);
+  const env = readPublicEnv();
+  const token = await accessToken(supabase);
+  if (!space || !env || !token) return { error: "connections.error.failed" };
+
+  const created = await supabase
+    .from("connections")
+    .insert({ space_id: spaceId, kind: "psd2", provider: "enable_banking", created_by: userId })
+    .select("id")
+    .single();
+  const connectionId = z.object({ id: z.uuid() }).safeParse(created.data);
+  if (created.error || !connectionId.success) {
+    logger.warn("connection.create_failed", { code: created.error?.code ?? "unknown", spaceId });
+    return { error: "connections.error.failed" };
+  }
+  const id = connectionId.data.id;
+
+  const started = await callConnectBank(env, token, {
+    action: "start",
+    connection_id: id,
+    bank_name: bank,
+    country,
+  });
+  const url = started.ok ? started.data.url : null;
+  if (!started.ok || typeof url !== "string") {
+    logger.warn("connection.start_failed", {
+      code: started.ok ? "no_url" : started.error,
+      spaceId,
+    });
+    await supabase.rpc("revoke_connection", { p_connection_id: id });
+    return { error: started.ok ? "connections.error.failed" : edgeErrorKey(started.error) };
+  }
+  redirect(url);
+}
+
+/**
+ * Paso final del banco: vincula cada cuenta del banco con una cuenta de MyMoney de su misma
+ * moneda. Las cuentas que ofrece el banco se vuelven a pedir a la función (no se fía del cliente)
+ * y lo que no se vincula no se sincroniza.
+ */
+export async function linkBankAccountsAction(
+  _previous: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const { supabase } = await requireReadyUser();
+  const parsed = linkBankInput.safeParse({
+    spaceId: formText(formData, "spaceId"),
+    connectionId: formText(formData, "connectionId"),
+  });
+  if (!parsed.success) return fieldErrorsFrom(parsed.error);
+  const { spaceId, connectionId } = parsed.data;
+  const space = await loadSpace(supabase, spaceId);
+  const env = readPublicEnv();
+  const token = await accessToken(supabase);
+  if (!space || !env || !token) return { error: "connections.error.failed" };
+
+  const offered = await callConnectBank(env, token, {
+    action: "accounts",
+    connection_id: connectionId,
+  });
+  const bankAccounts = z.array(bankAccount).safeParse(offered.ok ? offered.data.accounts : null);
+  if (!offered.ok || !bankAccounts.success) {
+    return { error: offered.ok ? "connections.error.failed" : edgeErrorKey(offered.error) };
+  }
+  const today = calendarDateInZone(new Date(), space.timezone);
+  const mine = (await loadAccountOptions(supabase, spaceId, today)).filter((a) => !a.is_liability);
+  const chosen = new Set<string>();
+  const rows: { uid: string; accountId: string }[] = [];
+  for (const account of bankAccounts.data) {
+    const accountId = formText(formData, `account:${account.uid}`);
+    if (accountId === "") continue;
+    const target = mine.find((a) => a.id === accountId);
+    if (!target || target.currency !== (account.currency || "EUR") || chosen.has(accountId)) {
+      return { error: "connections.bank.link_invalid" };
+    }
+    chosen.add(accountId);
+    rows.push({ uid: account.uid, accountId });
+  }
+  if (rows.length === 0) return { error: "connections.bank.link_none" };
+
+  const inserted = await supabase.from("connection_accounts").insert(
+    rows.map((r) => ({
+      connection_id: connectionId,
+      space_id: spaceId,
+      account_id: r.accountId,
+      external_ref: r.uid,
+    })),
+  );
+  if (inserted.error) {
+    logger.warn("connection.link_failed", { code: inserted.error.code, spaceId });
+    return { error: "connections.bank.link_failed" };
+  }
+  await supabase.rpc("request_sync", { p_connection_id: connectionId });
+  redirect(`/s/${spaceId}/conexiones?sync=queued`);
 }

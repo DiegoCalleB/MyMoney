@@ -294,3 +294,5 @@ I-1 e I-2 dan el mayor valor con el menor esfuerzo y no dependen de nada. I-3 a 
 - [Portfolio Performance: CSV de Trade Republic](https://forum.portfolio-performance.info/t/import-trade-republic-csv-transaktionsexport/39126) · [Getquin: exportación desde abril de 2026](https://help.getquin.com/en/articles/14633614)
 - [Thede Consulting: estado de FiDA (julio de 2026)](https://thede-consulting.com/en/payment-en/fida-back-in-motion-from-ambitious-to-workable/)
 - Reglamento Delegado (UE) 2018/389 (normas técnicas de autenticación reforzada), art. 36.5: límite de 4 accesos diarios sin el usuario presente.
+
+> **Estado de implementación (2026-10-29):** pasos I-1 a I-4 y el conector PSD2 (I-5, código) están hechos y probados con datos inventados; lo que sigue sin hacer o sin verificar contra los servicios reales está en [17-estado-integraciones-y-pendientes.md](17-estado-integraciones-y-pendientes.md).
