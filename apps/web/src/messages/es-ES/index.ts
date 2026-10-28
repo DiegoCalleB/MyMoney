@@ -252,6 +252,9 @@ export const esES = {
     "Se calcula con tus movimientos importados o apuntados. Compara cada gasto con los anteriores de su categoría y con los cargos de igual descripción. Los umbrales son aproximados.",
   "review.why.summary": "¿Cómo se detecta?",
   "review.uncategorized": "Sin categoría",
+  "review.recognize": "Ya lo reconozco",
+  "review.failed": "No hemos podido marcarlo. Inténtalo de nuevo.",
+  "review.badge": "{count} por revisar",
   "anomaly.possible_duplicate":
     "Cargo de {amount} el {date} igual a otro del {other}. Puede ser un cobro duplicado.",
   "anomaly.recurring_change":
