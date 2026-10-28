@@ -40,3 +40,30 @@ Orden: primero «Generate Domain», luego `APP_ORIGIN` con esa dirección.
 ## Qué rama se despliega
 
 Railway despliega la rama conectada a producción cada vez que se sube un cambio. Si la rama no contiene la aplicación, la compilación falla (la comprobación de salud impide que una versión rota sustituya a la que funciona). Con datos reales en Supabase: cada subida a esa rama llega a producción.
+
+## Precios automáticos de criptoactivos (opcional)
+
+Una Edge Function (`supabase/functions/update-prices`) guarda en `ref.prices` el precio de los criptoactivos que hay en tus cuentas (los activos con `kind = 'crypto'` y `ticker`). Solo lee la API pública de Binance (sin clave). Antes de abrir la app a otras personas, confirma las condiciones de uso de los datos de Binance [A VERIFICAR].
+
+**Nada de esto se hace solo: cada paso lo aplica la persona propietaria** (regla 12; primero en un proyecto de pruebas).
+
+1. Aplicar la migración `20261029010000_price_feed.sql` (crea `crypto_tickers()` y `upsert_ref_prices()`, ejecutables solo por `service_role`).
+2. Guardar los secretos de la función (Supabase → Edge Functions → Secrets, o `supabase secrets set`): `PRICE_FEED_SECRET` (aleatorio de 32 bytes o más, `openssl rand -base64 32`). Opcionales: `PRICE_FEED_QUOTE` (`EUR` por defecto) y `BINANCE_API_BASE`. `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` los pone Supabase; la clave secreta no sale de la función.
+3. Desplegar: `supabase functions deploy update-prices`.
+4. Programar con `pg_cron` y `pg_net` (cada 6 horas, a un minuto que no sea 0), guardando el secreto y la clave publicable en Vault, no en el SQL:
+
+   ```sql
+   select cron.schedule('update-prices', '17 */6 * * *', $$
+     select net.http_post(
+       url := (select decrypted_secret from vault.decrypted_secrets where name = 'project_url') || '/functions/v1/update-prices',
+       headers := jsonb_build_object(
+         'Content-Type', 'application/json',
+         'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'publishable_key'),
+         'x-cron-secret', (select decrypted_secret from vault.decrypted_secrets where name = 'price_feed_secret')),
+       body := '{}'::jsonb);
+   $$);
+   ```
+
+5. Comprobar con una llamada manual: la respuesta solo lleva contadores (`updated`, `rejected`, `symbols`).
+
+Los límites de Binance son por IP, no por usuario: una petición cada 6 horas, con hasta 100 símbolos, queda muy por debajo.
