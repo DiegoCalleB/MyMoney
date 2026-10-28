@@ -1,6 +1,6 @@
 -- Conexiones automáticas (ADR-0022): permisos de usuarios, bóveda, cola, cubo de fichas e ingesta.
 begin;
-select plan(100);
+select plan(111);
 
 select tests.create_user('alicia@example.test') as alicia \gset
 select tests.create_user('vic@example.test') as vic \gset
@@ -90,6 +90,7 @@ select throws_ok(format($$select public.put_connection_secret(%L, '\x00'::bytea,
 select throws_ok(format($$select * from public.get_connection_secret(%L)$$, :'cn'), '42501', null, 'un usuario no lee secretos');
 select throws_ok(format($$select public.activate_connection(%L)$$, :'cn'), '42501', null, 'un usuario no activa conexiones');
 select throws_ok($$select * from public.claim_sync_jobs(5)$$, '42501', null, 'un usuario no reclama trabajos');
+select throws_ok(format($$select * from public.get_connection_info(%L)$$, :'cn'), '42501', null, 'un usuario no lee la ficha del servidor');
 select throws_ok($$select public.schedule_due_syncs()$$, '42501', null, 'un usuario no programa sincronizaciones');
 select throws_ok(format($$select public.ingest_sync(%L, '{}'::jsonb)$$, :'cn'), '42501', null, 'un usuario no ingiere datos');
 select throws_ok($$select public.take_rate_tokens('x', 1, 1, 1)$$, '42501', null, 'un usuario no usa el cubo de fichas');
@@ -104,6 +105,10 @@ select public.put_connection_secret(:'cn', '\x0102030405060708090a0b0c0d0e0f1011
   decode(repeat('0b', 40), 'hex'), decode(repeat('0c', 12), 'hex'), 1::smallint, 'huella-publica');
 select is((select count(*)::int from public.get_connection_secret(:'cn')), 1, 'el servidor lee el secreto de una conexión pendiente');
 select is((select provider from public.get_connection_secret(:'cn')), 'binance', 'y sabe de qué proveedor es');
+select is((select status from public.get_connection_info(:'cn')), 'pending', 'la ficha del servidor trae el estado');
+select is((select provider from public.get_connection_info(:'cn')), 'binance', 'el proveedor');
+select is((select space_id from public.get_connection_info(:'cn')), :'sp'::uuid, 'y el espacio');
+select is((select count(*)::int from public.get_connection_info('00000000-0000-4000-8000-000000000000')), 0, 'una conexión inexistente no devuelve nada');
 select public.put_connection_secret(:'cn', '\x0102030405060708090a0b0c0d0e0f1022'::bytea, decode(repeat('0a', 12), 'hex'),
   decode(repeat('0b', 40), 'hex'), decode(repeat('0c', 12), 'hex'), 2::smallint, 'otra');
 select is((select kek_version from public.get_connection_secret(:'cn')), 2::smallint, 'guardar de nuevo sustituye el secreto (rotación)');
@@ -299,6 +304,24 @@ select throws_ok(format($$select public.ingest_sync(%L, '{}'::jsonb)$$, :'cn'), 
 select is((select count(*)::int from public.get_connection_secret(:'cn')), 0, 'ni entrega secretos');
 select tests.as_postgres();
 select is((select count(*)::int from audit.events where action like 'connection.%' and space_id = :'sp'::uuid), 10, 'queda rastro en la auditoría, sin contenido');
+
+-- ---------------------------------------------------------------------------
+-- Segundo factor (regla 10): conectar o revocar exige AAL2 si la persona tiene MFA
+-- ---------------------------------------------------------------------------
+select tests.as_postgres();
+insert into public.connections (space_id, kind, provider, created_by) values (:'sp', 'api', 'binance', :'alicia') returning id as cn_mfa \gset
+select tests.authenticate_as(:'alicia');
+select is(public.can_manage_connection(:'cn_mfa'), true, 'sin segundo factor activado, quien escribe puede gestionar');
+select is(public.can_manage_connection('00000000-0000-4000-8000-000000000000'), false, 'una conexión inexistente no se puede gestionar');
+select tests.authenticate_as(:'vic');
+select is(public.can_manage_connection(:'cn_mfa'), false, 'solo lectura no puede gestionar');
+select tests.as_postgres();
+select tests.verify_mfa(:'alicia');
+select tests.authenticate_as(:'alicia', 'aal1');
+select is(public.can_manage_connection(:'cn_mfa'), false, 'con MFA activado y sesión aal1 no se puede gestionar');
+select throws_ok(format($$select public.revoke_connection(%L)$$, :'cn_mfa'), '42501', null, 'ni revocar');
+select tests.authenticate_as(:'alicia', 'aal2');
+select is(public.can_manage_connection(:'cn_mfa'), true, 'con aal2 sí');
 
 select * from finish();
 rollback;

@@ -212,10 +212,11 @@ create function public.can_manage_connection(p_connection_id uuid) returns boole
 language sql stable set search_path = ''
 as $$
   select coalesce(
-    (select private.can_write(c.space_id) from public.connections c where c.id = p_connection_id),
+    (select private.can_write(c.space_id) and private.meets_sensitive_aal()
+       from public.connections c where c.id = p_connection_id),
     false);
 $$;
-comment on function public.can_manage_connection is 'true si el usuario autenticado puede escribir en el espacio de la conexión (RLS: solo ve las suyas).';
+comment on function public.can_manage_connection is 'true si el usuario autenticado puede escribir en el espacio de la conexión y, si tiene segundo factor, lo ha verificado en esta sesión (regla 10: conectar o cambiar credenciales es una acción sensible). RLS: solo ve las suyas.';
 
 -- Pide una sincronización. security definer: encola en private.sync_jobs, que el usuario no toca.
 -- Comprueba permiso de escritura y limita a una petición cada 15 minutos por conexión.
@@ -247,7 +248,7 @@ $$;
 comment on function public.request_sync is 'Encola una sincronización de la conexión (máximo una petición cada 15 minutos).';
 
 -- Revoca una conexión: la deja inutilizable (estado revocado), borra su secreto y sus trabajos
--- pendientes. Usuario con permiso de escritura, o el servidor (p. ej., credenciales rechazadas).
+-- pendientes. Usuario con permiso de escritura y AAL suficiente (regla 10), o el servidor (p. ej., credenciales rechazadas).
 -- No revoca nada en el proveedor: la interfaz pide además borrar la clave allí.
 create function public.revoke_connection(p_connection_id uuid) returns void
 language plpgsql security definer set search_path = ''
@@ -256,7 +257,8 @@ declare
   v_c public.connections;
 begin
   select c.* into v_c from public.connections c where c.id = p_connection_id for update;
-  if not found or not ((select auth.role()) = 'service_role' or private.can_write(v_c.space_id)) then
+  if not found or not ((select auth.role()) = 'service_role'
+                       or (private.can_write(v_c.space_id) and private.meets_sensitive_aal())) then
     raise exception 'Conexión no encontrada o sin permiso' using errcode = 'insufficient_privilege';
   end if;
   if v_c.status = 'revoked' then
@@ -347,6 +349,20 @@ begin
 end;
 $$;
 comment on function public.activate_connection is 'Marca la conexión como activa tras validar sus credenciales. Solo service_role.';
+
+create function public.get_connection_info(p_connection_id uuid)
+returns table (space_id uuid, provider text, status text)
+language plpgsql security definer set search_path = ''
+as $$
+begin
+  if (select auth.role()) is distinct from 'service_role' then
+    raise exception 'Solo el servidor puede leer conexiones' using errcode = 'insufficient_privilege';
+  end if;
+  return query
+    select c.space_id, c.provider, c.status from public.connections c where c.id = p_connection_id;
+end;
+$$;
+comment on function public.get_connection_info is 'Espacio, proveedor y estado de una conexión, para la Edge Function. Solo service_role.';
 
 create function public.take_rate_tokens(
   p_bucket text, p_n numeric, p_capacity numeric, p_refill_per_sec numeric
@@ -652,7 +668,7 @@ comment on function public.ingest_sync is 'Escribe lo que trae una sincronizaci�
 revoke execute on function
   public.can_manage_connection(uuid), public.request_sync(uuid), public.revoke_connection(uuid),
   public.put_connection_secret(uuid, bytea, bytea, bytea, bytea, smallint, text),
-  public.get_connection_secret(uuid), public.activate_connection(uuid, timestamptz),
+  public.get_connection_secret(uuid), public.get_connection_info(uuid), public.activate_connection(uuid, timestamptz),
   public.take_rate_tokens(text, numeric, numeric, numeric), public.claim_sync_jobs(integer),
   public.finish_sync_job(bigint, text, text, integer), public.schedule_due_syncs(),
   public.ingest_sync(uuid, jsonb)
@@ -663,7 +679,7 @@ to authenticated;
 grant execute on function
   public.revoke_connection(uuid),
   public.put_connection_secret(uuid, bytea, bytea, bytea, bytea, smallint, text),
-  public.get_connection_secret(uuid), public.activate_connection(uuid, timestamptz),
+  public.get_connection_secret(uuid), public.get_connection_info(uuid), public.activate_connection(uuid, timestamptz),
   public.take_rate_tokens(text, numeric, numeric, numeric), public.claim_sync_jobs(integer),
   public.finish_sync_job(bigint, text, text, integer), public.schedule_due_syncs(),
   public.ingest_sync(uuid, jsonb)
