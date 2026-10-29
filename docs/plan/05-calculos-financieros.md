@@ -71,6 +71,8 @@ Ganancia = Valor actual − Σ aportaciones externas + Σ retiradas externas. La
 
 ### Riesgo y escenarios (`risk/`)
 
+> **Implementado en `finance-core`** (`risk.ts`): `exposure` por clase de activo (composición, clase principal o sin clasificar), `concentration` (peso máximo, Herfindahl, número efectivo), `stressScenario` (sin correlaciones, con meses de gasto) y `speculativeShare`. Pendiente: la pantalla y de dónde sale la clase de cada cuenta.
+
 | Función | Descripción |
 |---------|-------------|
 | `exposure(positions, assets)` | Exposición por clase de activo, moneda, entidad, activo y titular. Los fondos mixtos se reparten con su composición por clase de activo (`asset_compositions`); sin ella, se usa la clase principal y se marca la calidad del dato como baja |
