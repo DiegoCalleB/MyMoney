@@ -93,6 +93,9 @@ export default async function HomePage({ params }: { params: Promise<{ spaceId: 
           <br />
           <span className={shell.muted}>
             {meta ? t(`account.kind.${meta.kind}`) : ""} ·{" "}
+            {line.shareBps < 10000
+              ? `${t("account.share.badge", { percent: String(line.shareBps / 100) })} · `
+              : ""}
             {line.stale
               ? t("home.value.stale", { days: age })
               : line.ageDays === 0

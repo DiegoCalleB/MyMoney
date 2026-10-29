@@ -55,6 +55,7 @@ export const accountRow = z.object({
   scope: z.enum(["household", "external"]),
   closed_on: date.nullable(),
   institution_id: z.uuid().nullable(),
+  share_bps: z.number().int().min(1).max(10000),
 });
 
 export const balanceRow = z.object({
@@ -161,6 +162,7 @@ export function buildHomeModel(rows: HomeRows, today: CalendarDate): HomeModel {
     return {
       accountId: a.id,
       isLiability: a.is_liability,
+      shareBps: a.share_bps,
       ...(cash.length > 0
         ? {
             ledger: {

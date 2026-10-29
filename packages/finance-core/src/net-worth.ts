@@ -23,6 +23,8 @@ export interface AccountInput {
    * apuntado después de valorar la cuenta cambia el patrimonio sin esperar otra valoración.
    */
   readonly movementsAfterValuation?: ObservedValue;
+  /** Tu parte de la cuenta en puntos básicos (1-10000); si falta, toda la cuenta. */
+  readonly shareBps?: number;
 }
 
 /** Reparto vigente de una cuenta entre bolsillos (`pocket_allocations_on`). */
@@ -52,7 +54,9 @@ export interface AccountLine {
   readonly original: Money;
   /** Movimientos posteriores a la valoración que ya están incluidos en `original`, si los hubo. */
   readonly movementsAfterValuation?: Money;
-  /** Aportación al patrimonio en la moneda base (negativa en pasivos). */
+  /** Tu parte de la cuenta en puntos básicos; `contribution` ya la aplica. */
+  readonly shareBps: number;
+  /** Aportación al patrimonio en la moneda base, solo tu parte (negativa en pasivos). */
   readonly contribution: Money;
   readonly fx: FxExplanation;
   readonly ageDays: number;
@@ -103,6 +107,7 @@ const ASSUMPTIONS = [
   "net_worth.liabilities_subtract",
   "net_worth.fx_latest_on_or_before",
   "net_worth.unallocated_to_unassigned",
+  "net_worth.account_share_applied",
 ] as const;
 
 /**
@@ -158,10 +163,15 @@ export function netWorth(input: NetWorthInput): NetWorthResult {
       continue;
     }
     const ageDays = daysBetween(value.asOf, onDate);
+    const shareBps = account.shareBps ?? FULL_BPS;
     lines.push({
       accountId: account.accountId,
       ...value,
-      contribution: converted.value.value,
+      shareBps,
+      contribution: allocate(converted.value.value, [
+        BigInt(shareBps),
+        BigInt(FULL_BPS - shareBps),
+      ])[0] as Money,
       fx: converted.value.explanation,
       ageDays,
       stale: ageDays > staleAfterDays,

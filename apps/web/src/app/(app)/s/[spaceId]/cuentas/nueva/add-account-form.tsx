@@ -77,6 +77,17 @@ export function AddAccountForm({
         maxLength={32}
         error={errors?.currentValue}
       />
+      <Field
+        id="sharePercent"
+        name="sharePercent"
+        label={t("account.share.label")}
+        hint={t("account.share.hint")}
+        inputMode="numeric"
+        autoComplete="off"
+        maxLength={3}
+        defaultValue="100"
+        error={errors?.sharePercent}
+      />
       <SubmitButton>{t("account.new.submit")}</SubmitButton>
     </form>
   );

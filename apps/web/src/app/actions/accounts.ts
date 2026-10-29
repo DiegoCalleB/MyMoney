@@ -26,9 +26,10 @@ export async function addAccountAction(
     currency: formText(formData, "currency"),
     currentValue: formText(formData, "currentValue"),
     institution: formText(formData, "institution") || undefined,
+    sharePercent: formText(formData, "sharePercent") || undefined,
   });
   if (!parsed.success) return fieldErrorsFrom(parsed.error);
-  const { spaceId, name, kind, currency, currentValue, institution } = parsed.data;
+  const { spaceId, name, kind, currency, currentValue, institution, sharePercent } = parsed.data;
   if (!isCurrencyCode(currency))
     return { fieldErrors: { currency: "validation.currency_invalid" } };
 
@@ -72,6 +73,7 @@ export async function addAccountAction(
       kind,
       currency,
       liquidity: defaultLiquidity(kind),
+      share_bps: Number(sharePercent) * 100,
       ...(institutionId ? { institution_id: institutionId } : {}),
     })
     .select("id")

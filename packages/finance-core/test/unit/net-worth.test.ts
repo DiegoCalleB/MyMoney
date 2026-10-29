@@ -226,4 +226,37 @@ describe("netWorth", () => {
     );
     expect(r.explanation.accounts[0]?.asOf).toBe(d("2026-10-20"));
   });
+
+  it("una cuenta compartida solo aporta tu parte, también en deudas y con redondeo", () => {
+    const r = netWorth(
+      base({
+        accounts: [
+          { ...ledger("conjunta", 186_81n), shareBps: 5000 },
+          ledger("propia", 100_00n),
+          {
+            accountId: "deuda",
+            isLiability: true,
+            valuation: { amount: money(200_00n, "EUR"), asOf: d("2026-10-20") },
+            shareBps: 2500,
+          },
+        ],
+      }),
+    );
+    // 186,81 al 50 % = 93,405 → 93,41 (el céntimo sobrante va a tu parte); deuda 200 al 25 % = 50
+    expect(r.value.assets).toEqual(money(193_41n, "EUR"));
+    expect(r.value.liabilities).toEqual(money(50_00n, "EUR"));
+    expect(r.explanation.accounts.map((l) => l.shareBps)).toEqual([5000, 10000, 2500]);
+    expect(r.explanation.assumptions).toContain("net_worth.account_share_applied");
+  });
+
+  it("la parte repartida entre bolsillos suma lo mismo que tu aportación", () => {
+    const r = netWorth(
+      base({
+        accounts: [{ ...ledger("a", 100_00n), shareBps: 5000 }],
+        allocations: [{ pocketId: "p", accountId: "a", assetId: null, weightBps: 10000 }],
+      }),
+    );
+    expect(r.value.byPocket).toEqual([{ pocketId: "p", value: money(50_00n, "EUR") }]);
+    expect(r.value.unassigned).toEqual(money(0n, "EUR"));
+  });
 });

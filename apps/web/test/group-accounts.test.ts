@@ -7,6 +7,7 @@ const line = (id: string, minor: bigint): AccountLine => ({
   basis: "valuation",
   asOf: calendarDate("2026-10-25"),
   original: money(minor, "EUR"),
+  shareBps: 10000,
   contribution: money(minor, "EUR"),
   fx: { method: "identity", effectiveRate: "1", rates: [], staleDays: 0 },
   ageDays: 0,
