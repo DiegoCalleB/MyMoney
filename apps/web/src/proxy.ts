@@ -5,7 +5,7 @@ import { readPublicEnv } from "@/lib/env";
 import { SESSION_COOKIE_OPTIONS } from "@/server/session-cookies";
 
 /** Rutas que exigen sesión. La comprobación de verdad la repite cada página (defensa en profundidad). */
-const PROTECTED_PREFIXES = ["/s/", "/hogares", "/seguridad", "/verificar-mfa"];
+const PROTECTED_PREFIXES = ["/s/", "/hogares", "/seguridad", "/verificar-mfa", "/conexiones"];
 
 export async function proxy(request: NextRequest) {
   const env = readPublicEnv();

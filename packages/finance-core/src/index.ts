@@ -9,3 +9,7 @@ export * from "./returns";
 export * from "./advice";
 export * from "./anomalies";
 export * from "./performance";
+export * from "./exposure";
+export * from "./income";
+export * from "./benchmark";
+export * from "./tax";

@@ -1,6 +1,7 @@
 packages:
   - "apps/*"
   - "packages/*"
+  - "supabase/functions"
 # Solo estos paquetes pueden ejecutar scripts de instalación (cadena de suministro).
 onlyBuiltDependencies:
   - esbuild

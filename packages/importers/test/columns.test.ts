@@ -191,3 +191,27 @@ describe("cleanAmount", () => {
     expect(cleanAmount("€", "es")).toBeNull();
   });
 });
+
+describe("parseDateCell con números de serie de Excel", () => {
+  it("convierte días desde 1899-12-30 e ignora la hora", () => {
+    expect(parseDateCell("45962", "serial")).toBe("2025-11-01");
+    expect(parseDateCell("45962.75", "serial")).toBe("2025-11-01");
+    expect(parseDateCell(" 61 ", "serial")).toBe("1900-03-01");
+    expect(parseDateCell("2958465", "serial")).toBe("9999-12-31");
+  });
+
+  it("rechaza lo que no es un día válido", () => {
+    for (const text of ["", "abc", "-5", "60", "0", "2958466", "12345678", "1,5", "2026-10-28"]) {
+      expect(parseDateCell(text, "serial")).toBeNull();
+    }
+  });
+});
+
+describe("parseDateCell con dmy_serial", () => {
+  it("usa la serie si la celda es un número y día-mes-año si es texto", () => {
+    expect(parseDateCell("45962", "dmy_serial")).toBe("2025-11-01");
+    expect(parseDateCell("01/10/2026 10:00:00", "dmy_serial")).toBe("2026-10-01");
+    expect(parseDateCell("basura", "dmy_serial")).toBeNull();
+    expect(parseDateCell("5", "dmy_serial")).toBeNull();
+  });
+});

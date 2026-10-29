@@ -22,3 +22,10 @@ export type ImportTextInput = z.infer<typeof importTextInput>;
 /** Confirmar, descartar o deshacer una importación ya registrada. */
 export const importBatchInput = z.object({ spaceId: uuid, batchId: uuid });
 export type ImportBatchInput = z.infer<typeof importBatchInput>;
+
+/** Subida de un extracto: el archivo llega aparte (FormData); aquí solo los identificadores. */
+export const previewImportInput = z.object({ spaceId: uuid, accountId: uuid });
+export type PreviewImportInput = z.infer<typeof previewImportInput>;
+
+export const confirmImportInput = importBatchInput.extend({ keepDescriptions: z.boolean() });
+export type ConfirmImportInput = z.infer<typeof confirmImportInput>;

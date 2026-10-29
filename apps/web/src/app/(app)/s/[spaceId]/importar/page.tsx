@@ -36,6 +36,7 @@ export default async function ImportPage({ params }: { params: Promise<{ spaceId
         />
       )}
       <p className={styles.links}>
+        <Link href={`/s/${space.id}/importar/archivo`}>{t("import.file.link")}</Link>
         <Link href={`/s/${space.id}/inicio`}>{t("common.back")}</Link>
       </p>
     </main>

@@ -6,7 +6,9 @@ import { t } from "@/lib/i18n";
 import { requireReadyUser } from "@/server/auth";
 import { loadHome } from "@/server/queries/home";
 import styles from "../../../../page.module.css";
+import { formatBpsAsPercent } from "@/lib/percent";
 import { AssumptionsForm } from "./assumptions-form";
+import { ThresholdsForm } from "./thresholds-form";
 
 export const metadata: Metadata = { title: t("assumptions.title") };
 
@@ -31,6 +33,18 @@ export default async function AssumptionsPage({
         currency={home.space.base_currency}
         // Importe en unidades principales, con coma decimal, para editarlo tal cual.
         initial={current ? (Number(current.minor) / 100).toFixed(2).replace(".", ",") : ""}
+      />
+      <h2 className={styles.heading2}>{t("thresholds.title")}</h2>
+      <p className={styles.lead}>{t("thresholds.intro")}</p>
+      <ThresholdsForm
+        spaceId={home.space.id}
+        initial={{
+          speculative: formatBpsAsPercent(home.thresholds.speculativeShareBps),
+          institution: formatBpsAsPercent(home.thresholds.institutionShareBps),
+          liquid: formatBpsAsPercent(home.thresholds.liquidShareBps),
+          runwayMin: String(home.thresholds.runwayMinMonths),
+          runwayMax: String(home.thresholds.runwayMaxMonths),
+        }}
       />
       <p className={styles.links}>
         <Link href={`/s/${home.space.id}/inicio`}>{t("common.back")}</Link>

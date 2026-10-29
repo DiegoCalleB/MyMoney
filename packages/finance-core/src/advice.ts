@@ -1,3 +1,4 @@
+import { daysBetween, type CalendarDate } from "./calendar-date";
 import { Decimal } from "./decimal";
 import { toDecimal, type CurrencyCode, type Money } from "./money";
 
@@ -18,8 +19,25 @@ export interface AdviceAccount {
   readonly stale: boolean;
 }
 
+/** Bolsillo con su valor en la moneda base y el riesgo máximo que la persona admite en él. */
+export interface AdvicePocket {
+  readonly pocketId: string;
+  readonly riskLevel: "none" | "low" | "medium" | "high" | "speculative";
+  readonly value: Money;
+}
+
+/** Operaciones planificadas aún sin hacer, para avisar de las que ya han vencido. */
+export interface AdviceSchedule {
+  /** "Hoy" en la zona del espacio: la librería no lee el reloj. */
+  readonly onDate: CalendarDate;
+  /** Fechas previstas de las operaciones con estado «planificada». */
+  readonly pending: readonly CalendarDate[];
+}
+
 /** Umbrales editables: son supuestos de la persona, no verdades del programa. */
 export interface AdviceThresholds {
+  /** Parte del patrimonio en bolsillos especulativos a partir de la cual se avisa (puntos básicos). */
+  readonly speculativeShareBps: number;
   /** Parte del patrimonio en una sola entidad a partir de la cual se avisa (puntos básicos). */
   readonly institutionShareBps: number;
   /** Parte en efectivo y cuentas de ahorro a partir de la cual se informa (puntos básicos). */
@@ -31,11 +49,70 @@ export interface AdviceThresholds {
 }
 
 export const DEFAULT_ADVICE_THRESHOLDS: AdviceThresholds = {
+  speculativeShareBps: 500,
   institutionShareBps: 4000,
   liquidShareBps: 4000,
   runwayMinMonths: 3,
   runwayMaxMonths: 12,
 };
+
+/**
+ * Qué supuesto (`assumptions.key`) edita cada umbral y entre qué valores es válido. Los
+ * umbrales son de la persona (regla 19): lo que no esté definido, o no sea válido, usa el valor
+ * por defecto y se informa en `ignored`.
+ */
+export const THRESHOLD_FIELDS = {
+  speculativeShareBps: { assumptionKey: "speculative_share_bps", unit: "bps", min: 0, max: 10_000 },
+  institutionShareBps: { assumptionKey: "institution_share_bps", unit: "bps", min: 0, max: 10_000 },
+  liquidShareBps: { assumptionKey: "liquid_share_bps", unit: "bps", min: 0, max: 10_000 },
+  runwayMinMonths: { assumptionKey: "runway_min_months", unit: "months", min: 0, max: 120 },
+  runwayMaxMonths: { assumptionKey: "runway_max_months", unit: "months", min: 1, max: 600 },
+} as const satisfies Record<
+  keyof AdviceThresholds,
+  {
+    assumptionKey: string;
+    unit: "bps" | "months";
+    min: number;
+    max: number;
+  }
+>;
+
+/** Claves de `assumptions` de los umbrales de avisos. */
+export const THRESHOLD_ASSUMPTION_KEYS: readonly string[] = Object.values(THRESHOLD_FIELDS).map(
+  (f) => f.assumptionKey,
+);
+
+const WHOLE_NUMBER = /^\d{1,9}(?:\.0+)?$/;
+
+/**
+ * Umbrales a partir de los supuestos guardados (el más reciente de cada clave). Un valor que no es
+ * un entero dentro de su rango se ignora; si los meses mínimo y máximo no cuadran (mínimo ≥
+ * máximo), se ignoran los dos. Nunca lanza: los avisos siguen funcionando con los valores por defecto.
+ */
+export function thresholdsFrom(
+  assumptions: readonly { readonly key: string; readonly value: string }[],
+  defaults: AdviceThresholds = DEFAULT_ADVICE_THRESHOLDS,
+): { thresholds: AdviceThresholds; ignored: readonly string[] } {
+  const next: { -readonly [K in keyof AdviceThresholds]: number } = { ...defaults };
+  const ignored: string[] = [];
+  for (const name of Object.keys(THRESHOLD_FIELDS) as (keyof AdviceThresholds)[]) {
+    const field = THRESHOLD_FIELDS[name];
+    const row = assumptions.find((a) => a.key === field.assumptionKey);
+    if (!row) continue;
+    const value = WHOLE_NUMBER.test(row.value) ? Number(row.value.split(".")[0]) : Number.NaN;
+    if (Number.isInteger(value) && value >= field.min && value <= field.max) next[name] = value;
+    else ignored.push(field.assumptionKey);
+  }
+  if (next.runwayMinMonths >= next.runwayMaxMonths) {
+    next.runwayMinMonths = defaults.runwayMinMonths;
+    next.runwayMaxMonths = defaults.runwayMaxMonths;
+    ignored.push(
+      THRESHOLD_FIELDS.runwayMinMonths.assumptionKey,
+      THRESHOLD_FIELDS.runwayMaxMonths.assumptionKey,
+    );
+  }
+  return { thresholds: next, ignored };
+}
 
 export interface AdviceInput {
   readonly baseCurrency: CurrencyCode;
@@ -43,6 +120,10 @@ export interface AdviceInput {
   /** Gasto mensual que indica la persona (supuesto); `null` si aún no lo ha dado. */
   readonly monthlyExpense: Money | null;
   readonly thresholds: AdviceThresholds;
+  /** Bolsillos con su valor; sin ellos no se evalúa el tope especulativo. */
+  readonly pockets?: readonly AdvicePocket[];
+  /** Calendario de operaciones planificadas; sin él no se avisa de las vencidas. */
+  readonly schedule?: AdviceSchedule;
 }
 
 export interface Finding {
@@ -118,6 +199,29 @@ export function evaluateAdvice(input: AdviceInput): Finding[] {
       });
     }
 
+    if (input.pockets) {
+      const speculative = input.pockets
+        .filter((p) => p.riskLevel === "speculative" && p.value.minor > 0n)
+        .reduce((sum, p) => sum + p.value.minor, 0n);
+      const speculativeBps = shareBps(speculative, total);
+      if (speculativeBps > thresholds.speculativeShareBps) {
+        findings.push({
+          ruleId: "speculative_cap",
+          version: 1,
+          level: 2,
+          severity: speculativeBps > thresholds.speculativeShareBps * 2 ? "important" : "attention",
+          messageKey: "advice.speculative_cap",
+          params: {
+            shareBps: String(speculativeBps),
+            limitBps: String(thresholds.speculativeShareBps),
+          },
+          confidence,
+          inputsUsed: ["pockets.risk_level", "pockets.value", "accounts.value"],
+          assumptionsUsed: ["speculative_share_bps"],
+        });
+      }
+    }
+
     const expense = input.monthlyExpense;
     if (expense && expense.currency === baseCurrency && expense.minor > 0n) {
       const months = toDecimal({ minor: liquid, currency: baseCurrency }).div(toDecimal(expense));
@@ -147,6 +251,26 @@ export function evaluateAdvice(input: AdviceInput): Finding[] {
           assumptionsUsed: ["monthly_expense", "runway_max_months"],
         });
       }
+    }
+  }
+
+  if (input.schedule) {
+    const { onDate, pending } = input.schedule;
+    const overdue = pending.filter((date) => date < onDate).sort();
+    const oldest = overdue[0];
+    if (oldest !== undefined) {
+      const days = daysBetween(oldest, onDate);
+      findings.push({
+        ruleId: "planned_operation_due",
+        version: 1,
+        level: 2,
+        severity: days > 14 ? "attention" : "info",
+        messageKey: "advice.planned_due",
+        params: { count: String(overdue.length), days: String(days) },
+        confidence: "high",
+        inputsUsed: ["planned_operations.planned_on", "planned_operations.status"],
+        assumptionsUsed: [],
+      });
     }
   }
 

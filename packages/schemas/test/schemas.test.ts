@@ -3,6 +3,8 @@ import {
   ACCOUNT_KINDS,
   addAccountInput,
   addMovementInput,
+  linkBankInput,
+  startBankInput,
   importBatchInput,
   importTextInput,
   updateValuesInput,
@@ -172,6 +174,26 @@ describe("updateValuesInput", () => {
     expect(firstError(updateValuesInput.safeParse({ spaceId, asOf: "hoy" }))).toBe(
       "validation.date_invalid",
     );
+  });
+});
+
+describe("conexión bancaria", () => {
+  const spaceId = "0b4c7f0e-5a52-4a6c-8b53-1f1f6f2a9c01";
+
+  it("startBankInput exige país en mayúsculas y un banco no vacío", () => {
+    expect(startBankInput.parse({ spaceId, country: "ES", bank: "  Banco  " }).bank).toBe("Banco");
+    for (const bad of [
+      { spaceId, country: "es", bank: "B" },
+      { spaceId, country: "ES", bank: "" },
+      { spaceId, country: "ES", bank: "x".repeat(101) },
+    ]) {
+      expect(startBankInput.safeParse(bad).success).toBe(false);
+    }
+  });
+
+  it("linkBankInput pide ids válidos", () => {
+    expect(linkBankInput.safeParse({ spaceId, connectionId: spaceId }).success).toBe(true);
+    expect(linkBankInput.safeParse({ spaceId, connectionId: "x" }).success).toBe(false);
   });
 });
 
