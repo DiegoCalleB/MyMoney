@@ -22,7 +22,7 @@ test("el registro tiene etiquetas, ayuda de la contraseña y es accesible", asyn
 }) => {
   await page.goto("/registro");
   await expect(page.getByLabel("Correo electrónico")).toHaveAttribute("autocomplete", "email");
-  const password = page.getByLabel("Contraseña");
+  const password = page.getByLabel("Contraseña", { exact: true });
   await expect(password).toHaveAttribute("autocomplete", "new-password");
   await expect(password).toHaveAccessibleDescription(/al menos 12 caracteres/i);
   await expectAccessible(page);
@@ -31,7 +31,10 @@ test("el registro tiene etiquetas, ayuda de la contraseña y es accesible", asyn
 
 test("entrar es accesible y permite pegar la contraseña", async ({ page, consoleErrors }) => {
   await page.goto("/entrar");
-  await expect(page.getByLabel("Contraseña")).toHaveAttribute("autocomplete", "current-password");
+  await expect(page.getByLabel("Contraseña", { exact: true })).toHaveAttribute(
+    "autocomplete",
+    "current-password",
+  );
   await expectAccessible(page);
   expect(consoleErrors).toEqual([]);
 });
