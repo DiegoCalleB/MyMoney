@@ -52,6 +52,7 @@ export const esES = {
 
   "auth.email.label": "Correo electrónico",
   "auth.password.label": "Contraseña",
+  "auth.password.show": "Mostrar la contraseña",
   "auth.password.hint":
     "Al menos 12 caracteres. Puedes usar una frase y pegar desde tu gestor de contraseñas.",
   "auth.sign_up.title": "Crea tu cuenta",

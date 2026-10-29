@@ -30,6 +30,33 @@
   width: 100%;
 }
 
+.inputWrap {
+  position: relative;
+  display: grid;
+}
+
+.inputWithToggle {
+  padding-right: 3.25rem;
+}
+
+.toggle {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 0;
+  width: 44px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.toggle:hover {
+  color: var(--text);
+}
+
 .input[aria-invalid="true"] {
   border-color: var(--danger);
 }
