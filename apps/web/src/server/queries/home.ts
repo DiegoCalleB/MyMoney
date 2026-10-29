@@ -101,7 +101,7 @@ export async function loadHome(supabase: Supabase, spaceId: string): Promise<Hom
   ] = await Promise.all([
     supabase
       .from("accounts")
-      .select("id,name,kind,is_liability,currency,scope,closed_on,institution_id")
+      .select("id,name,kind,is_liability,currency,scope,closed_on,institution_id,share_bps")
       .eq("space_id", spaceId)
       .is("archived_at", null),
     supabase.rpc("account_cash_balances", { p_space_id: spaceId, p_on: today }),
@@ -249,7 +249,7 @@ export async function loadAccountOptions(
 ): Promise<AccountOption[]> {
   const { data, error } = await supabase
     .from("accounts")
-    .select("id,name,kind,is_liability,currency,scope,closed_on,institution_id")
+    .select("id,name,kind,is_liability,currency,scope,closed_on,institution_id,share_bps")
     .eq("space_id", spaceId)
     .eq("scope", "household")
     .is("archived_at", null)

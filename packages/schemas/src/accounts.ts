@@ -43,6 +43,12 @@ export const addAccountInput = z.object({
   currentValue: amountText,
   /** Entidad donde está la cuenta (banco, bróker…). Opcional: agrupa las cuentas en el inicio. */
   institution: z.string().trim().max(80, { error: "validation.name_too_long" }).optional(),
+  /** Tu parte de la cuenta en %, por defecto 100 (una conjunta al 50 % lleva 50). */
+  sharePercent: z
+    .string()
+    .trim()
+    .regex(/^(100|[1-9]\d?)$/, { error: "account.share_invalid" })
+    .default("100"),
 });
 export type AddAccountInput = z.infer<typeof addAccountInput>;
 

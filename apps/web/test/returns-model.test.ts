@@ -12,6 +12,7 @@ const line = (n: number, minor: bigint, currency: "EUR" | "USD" = "EUR"): Accoun
   basis: "valuation",
   asOf: today,
   original: money(minor, currency),
+  shareBps: 10000,
   contribution: money(minor, currency),
   fx: { method: "identity", effectiveRate: "1", rates: [], staleDays: 0 },
   ageDays: 0,

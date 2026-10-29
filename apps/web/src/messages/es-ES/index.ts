@@ -352,6 +352,11 @@ export const esES = {
   "account.value.label": "Importe de hoy",
   "account.value.hint":
     "Si es una deuda (hipoteca, préstamo o tarjeta), escribe lo que debes, en positivo. Usa coma para los decimales, por ejemplo 1.234,56.",
+  "account.share.label": "Tu parte de la cuenta (%)",
+  "account.share.hint":
+    "100 si es solo tuya. Si es compartida, pon tu parte (por ejemplo 50 en una conjunta a medias): el patrimonio y los gastos solo cuentan esa parte.",
+  "account.share_invalid": "Pon un número entero del 1 al 100.",
+  "account.share.badge": "Tu parte: {percent} %",
   "account.new.submit": "Guardar cuenta",
   "account.new.failed": "No hemos podido guardar la cuenta. Inténtalo de nuevo.",
   "account.value_invalid":

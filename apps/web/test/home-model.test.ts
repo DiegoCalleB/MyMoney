@@ -27,6 +27,7 @@ const account = (n: number, over: Record<string, unknown> = {}) =>
     scope: "household",
     closed_on: null,
     institution_id: null,
+    share_bps: 10000,
     ...over,
   });
 
@@ -300,5 +301,13 @@ describe("movimientos posteriores a la valoración", () => {
       today,
     );
     expect(model.input.accounts[0]).not.toHaveProperty("movementsAfterValuation");
+  });
+
+  it("pasa tu parte de una cuenta compartida al cálculo del patrimonio", () => {
+    const model = buildHomeModel(
+      rows({ accounts: [account(1, { share_bps: 5000 }), account(2)] }),
+      today,
+    );
+    expect(model.input.accounts.map((a) => a.shareBps)).toEqual([5000, 10000]);
   });
 });
