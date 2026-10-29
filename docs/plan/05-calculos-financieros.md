@@ -71,7 +71,7 @@ Ganancia = Valor actual − Σ aportaciones externas + Σ retiradas externas. La
 
 ### Riesgo y escenarios (`risk/`)
 
-> **Implementado en `finance-core`** (`risk.ts`): `exposure` por clase de activo (composición, clase principal o sin clasificar), `concentration` (peso máximo, Herfindahl, número efectivo), `stressScenario` (sin correlaciones, con meses de gasto) y `speculativeShare`. Pendiente: la pantalla y de dónde sale la clase de cada cuenta.
+> **Implementado en `finance-core`** (`risk.ts`): `exposure` por clase de activo (composición, clase principal o sin clasificar), `concentration` (peso máximo, Herfindahl, número efectivo), `stressScenario` (sin correlaciones, con meses de gasto) y `speculativeShare`. Pantalla *Riesgo* hecha (ADR-0024): la clase sale del tipo de cuenta y se ajusta a mano por cuenta.
 
 | Función | Descripción |
 |---------|-------------|

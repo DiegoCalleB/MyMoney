@@ -224,6 +224,7 @@ Ejemplos:
 |-------|----------------------|
 | `pockets` | `kind` (`emergency`, `home`, `long_term`, `retirement`, `speculative`, `children`, `custom`), `name`, `target_minor`/`currency`/`target_on` (opcionales), `risk_level`, `horizon_years`, `person_id null`, `params jsonb` (supuestos del bolsillo, Zod) |
 | `loan_rate_periods` | `account_id`, `effective_from`, `annual_rate`, `index_value`, `source`: historial de revisiones del tipo de un préstamo |
+| `account_compositions` | `account_id`, `asset_class`, `weight_bps` (suma ≤ 10000 por cuenta; lo que falte, sin clasificar). Reparto vigente de una cuenta por clase de activo para el riesgo; se sustituye entero con `set_account_composition` (ADR-0024) |
 | `pocket_allocations` | `pocket_id`, `account_id`, `asset_id null`, `effective_from`, `weight_bps` (por conjunto: suma ≤ 10000 por destino; cuenta entera o por posiciones). Historial completo: `pocket_allocations_on(espacio, fecha)` da el vigente (ADR-0019) |
 | `institutions` | `name` (único), `kind`, `country_code` (ADR-0019) |
 | `user_consents` | `user_id`, `purpose` (`ai_explanations`), `policy_version`, `granted_at`, `withdrawn_at`; RLS por usuario |
@@ -311,7 +312,7 @@ Leyenda: **S** select, **I** insert, **U** update, **D** delete. "—" denegado.
 | `assets` | S I U D | S I U D | S | S | Sin catálogo global |
 | `transactions`, `transaction_legs` | S I U D | S I U D | S | S | Escritura mediante RPC; U/D solo en las primeras 24 h, después por inversión |
 | `valuations` | S I U D | S I U D | S | S | |
-| `assumptions`, `pockets`, `pocket_allocations`, `cash_rate_tiers`, `asset_fact_sheets`, `asset_compositions`, `investment_plans`, `planned_operations`, `tasks` | S I U D | S I U D | S | S | El tipo de un plan no se cambia |
+| `assumptions`, `pockets`, `pocket_allocations`, `account_compositions`, `cash_rate_tiers`, `asset_fact_sheets`, `asset_compositions`, `investment_plans`, `planned_operations`, `tasks` | S I U D | S I U D | S | S | El tipo de un plan no se cambia |
 | `advice_rules` | S I U (se archiva) | S I U | S | S | Sin borrado |
 | `advice_rule_revisions` | S | S | S | S | Lo escribe un trigger |
 | `risk_profiles` | S I U D | S I U D (de titulares) | S | S | |

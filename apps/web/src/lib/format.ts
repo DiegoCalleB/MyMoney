@@ -29,3 +29,20 @@ export function formatPercent(rate: Decimal): string {
     maximumFractionDigits: 2,
   }).format(rate.toFixed(8) as `${number}`);
 }
+
+/** Parte de un total en porcentaje, sin signo y con un decimal («37,5 %»). Recibe puntos básicos. */
+export function formatShare(bps: number): string {
+  return new Intl.NumberFormat(LOCALE, {
+    style: "percent",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 1,
+  }).format(String(bps / 10_000) as `${number}`);
+}
+
+/** Puntos básicos como porcentaje para un campo de texto: 6000 → "60", 1250 → "12,5", 305 → "3,05". */
+export function bpsToInputText(bps: number): string {
+  const whole = Math.floor(bps / 100);
+  const fraction = bps % 100;
+  if (fraction === 0) return String(whole);
+  return `${String(whole)},${String(fraction).padStart(2, "0").replace(/0$/, "")}`;
+}

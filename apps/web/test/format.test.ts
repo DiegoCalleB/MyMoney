@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { dec, money } from "@mymoney/finance-core";
-import { formatMoney, formatPercent } from "@/lib/format";
+import { bpsToInputText, formatMoney, formatPercent, formatShare } from "@/lib/format";
 
 const plain = (s: string) => s.replace(/\s/g, " ");
 
@@ -26,5 +26,23 @@ describe("formatPercent", () => {
     expect(plain(formatPercent(dec("0.1")))).toBe("+10,00 %");
     expect(plain(formatPercent(dec("-0.0534")))).toBe("-5,34 %");
     expect(plain(formatPercent(dec("0")))).toBe("0,00 %");
+  });
+});
+
+describe("formatShare", () => {
+  it("formatea puntos básicos como porcentaje sin signo", () => {
+    expect(plain(formatShare(5000))).toBe("50 %");
+    expect(plain(formatShare(3750))).toBe("37,5 %");
+    expect(plain(formatShare(0))).toBe("0 %");
+  });
+});
+
+describe("bpsToInputText", () => {
+  it("escribe los puntos básicos como porcentaje con coma", () => {
+    expect(bpsToInputText(6000)).toBe("60");
+    expect(bpsToInputText(1250)).toBe("12,5");
+    expect(bpsToInputText(305)).toBe("3,05");
+    expect(bpsToInputText(0)).toBe("0");
+    expect(bpsToInputText(10_000)).toBe("100");
   });
 });

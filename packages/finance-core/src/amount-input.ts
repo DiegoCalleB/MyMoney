@@ -24,3 +24,15 @@ export function parseLocalizedAmount(text: string, currency: CurrencyCode): Mone
   if (DOT_DECIMAL.test(value)) return parseAmount(value, currency, ".");
   return INTEGER.test(value) ? parseAmount(value, currency, ",") : null;
 }
+
+/**
+ * Lee un porcentaje escrito por una persona ("60", "12,5", "33,33") como puntos básicos enteros
+ * (6000, 1250, 3333). Admite hasta dos decimales y exige estar entre 0 y 100. Usa las mismas
+ * reglas que los importes: "12.5" es 12,5 y "1.000" no es válido, no se adivina.
+ */
+export function parsePercentBps(text: string): number | null {
+  // Un importe en una moneda de dos decimales son centésimas de unidad: 60 % = 6000 pb.
+  const parsed = parseLocalizedAmount(text, "EUR");
+  if (!parsed || parsed.minor < 0n || parsed.minor > 10_000n) return null;
+  return Number(parsed.minor);
+}

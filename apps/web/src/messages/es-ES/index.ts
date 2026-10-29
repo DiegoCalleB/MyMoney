@@ -253,6 +253,72 @@ export const esES = {
     "Cada cuenta vale su última valoración más lo aportado después.",
   "ledger.series_cost_basis_before_first_valuation":
     "Antes de su primera valoración, una cuenta vale lo aportado.",
+  "risk.link": "Riesgo",
+  "risk.title": "Riesgo y exposición",
+  "risk.lead":
+    "Dónde está tu dinero, cuánto se concentra y qué pasaría en una caída hipotética. Son escenarios para entender tu cartera, no previsiones.",
+  "risk.empty":
+    "Todavía no hay cuentas con valor. Añade una cuenta y su valor para ver su exposición.",
+  "risk.unavailable":
+    "No se puede calcular la exposición: el reparto de alguna cuenta no es válido.",
+  "risk.composition.title": "Qué tienes",
+  "risk.composition.low_quality":
+    "Parte de este reparto es una estimación por el tipo de cuenta. Ajusta las cuentas de inversión para afinarlo.",
+  "risk.composition.adjust": "Ajustar reparto",
+  "risk.composition.adjust_list": "Cuentas que puedes ajustar",
+  "risk.concentration.title": "Concentración",
+  "risk.concentration.account":
+    "Tu cuenta más grande es {name} y pesa el {share} de lo que tienes.",
+  "risk.concentration.class": "La clase que más pesa es {name} con el {share}.",
+  "risk.concentration.effective":
+    "Es como tener tu dinero repartido a partes iguales en {count} sitios.",
+  "risk.speculative.title": "Parte especulativa",
+  "risk.speculative.body":
+    "Lo que has marcado como especulativo (las cuentas de criptomonedas) es el {share} de lo que tienes:",
+  "risk.scenarios.title": "Escenarios de caída",
+  "risk.scenarios.note":
+    "Escenarios hipotéticos, no previsiones. Cada clase cae lo indicado y las demás no cambian; no hay correlaciones.",
+  "risk.scenario.moderate": "Caída moderada",
+  "risk.scenario.strong": "Caída fuerte",
+  "risk.scenario.crisis": "Crisis",
+  "risk.scenario.impact": "Es el {share} de lo que tienes.",
+  "risk.scenario.after": "Te quedarían",
+  "risk.scenario.months": "Equivale a {months} meses de tu gasto medio.",
+  "risk.scenario.no_spending":
+    "Sin gasto registrado de los últimos tres meses no se puede expresar en meses de gasto.",
+  "risk.scenario.shock": "{name}: {value}",
+  "risk.scenario.by_account": "Por cuenta",
+  "risk.explain.summary": "¿Cómo se calcula?",
+  "risk.explain.notes": "Avisos sobre los datos",
+  "risk.class_by_composition_or_main_class":
+    "Cada cuenta se reparte con su reparto por clases; si no lo hay, con la clase que corresponde a su tipo.",
+  "risk.unclassified_shown_apart":
+    "Lo que no se sabe de qué clase es se muestra aparte como sin clasificar.",
+  "risk.stress_hypothetical_not_forecast":
+    "Es una hipótesis para entender el riesgo, no una previsión.",
+  "risk.stress_no_correlations":
+    "No se modelan correlaciones: cada clase cae lo indicado y las demás no cambian.",
+  "risk.class_from_fallback": "{name}: clase estimada por el tipo de cuenta.",
+  "risk.composition_incomplete":
+    "{name}: el reparto no llega al 100 %; lo que falta está sin clasificar.",
+  "risk.unclassified": "{name}: sin clase conocida.",
+  "risk.edit.title": "Reparto de {name}",
+  "risk.edit.lead":
+    "Escribe qué parte de esta cuenta es de cada clase. Lo que falte hasta el 100 % queda sin clasificar. Déjalo en blanco para volver al valor por defecto.",
+  "risk.edit.submit": "Guardar reparto",
+  "risk.edit.back": "Volver a riesgo",
+  "risk.field_invalid": "Escribe un porcentaje entre 0 y 100, con hasta dos decimales.",
+  "risk.invalid": "Revisa los porcentajes marcados.",
+  "risk.sum_over": "La suma de los porcentajes supera el 100 %.",
+  "risk.failed": "No hemos podido guardar el reparto. Inténtalo de nuevo.",
+  "asset_class.equity": "Renta variable",
+  "asset_class.fixed_income": "Renta fija",
+  "asset_class.cash": "Liquidez",
+  "asset_class.real_estate": "Inmuebles",
+  "asset_class.crypto": "Criptomonedas",
+  "asset_class.commodity": "Materias primas",
+  "asset_class.mixed": "Mixto (sin detallar)",
+  "asset_class.unclassified": "Sin clasificar",
   "values.title": "Actualizar valores",
   "values.link": "Actualizar valores",
   "values.intro":

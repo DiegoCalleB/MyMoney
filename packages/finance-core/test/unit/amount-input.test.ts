@@ -1,6 +1,13 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { MINOR_UNITS, money, parseLocalizedAmount, toDecimal, type CurrencyCode } from "../../src";
+import {
+  MINOR_UNITS,
+  money,
+  parseLocalizedAmount,
+  parsePercentBps,
+  toDecimal,
+  type CurrencyCode,
+} from "../../src";
 
 const eur = (text: string) => parseLocalizedAmount(text, "EUR");
 
@@ -68,5 +75,23 @@ describe("parseLocalizedAmount", () => {
       ),
       { numRuns: 500 },
     );
+  });
+});
+
+describe("parsePercentBps", () => {
+  it.each([
+    ["60", 6000],
+    ["12,5", 1250],
+    ["33,33", 3333],
+    ["0", 0],
+    ["100", 10_000],
+    [" 7 ", 700],
+    ["12.5", 1250],
+  ])("%s → %s pb", (text, bps) => {
+    expect(parsePercentBps(text)).toBe(bps);
+  });
+
+  it.each(["", "abc", "-1", "100,01", "101", "12,345", "1.000"])("rechaza %j", (text) => {
+    expect(parsePercentBps(text)).toBeNull();
   });
 });
