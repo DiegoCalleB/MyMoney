@@ -13,7 +13,8 @@ const KEYS = Object.keys(esES).filter(
     k.startsWith("income.") ||
     k.startsWith("benchmark.") ||
     k.startsWith("tax.") ||
-    k.startsWith("exposure."),
+    k.startsWith("exposure.") ||
+    k.startsWith("anomaly."),
 );
 
 const ENTITIES =
