@@ -34,6 +34,7 @@ const movementRow = z.object({
     }),
   ),
 });
+const reviewedRow = z.object({ transaction_id: z.uuid(), rule_id: z.string() });
 const categoryRow = z.object({ id: z.uuid(), name: z.string() });
 
 export interface ReviewData {
@@ -51,7 +52,7 @@ export async function loadReview(supabase: Supabase, spaceId: string): Promise<R
   const today = calendarDateInZone(new Date(), space.timezone);
   const from = addDays(today, -365);
 
-  const [rows, categories] = await Promise.all([
+  const [rows, categories, reviewed] = await Promise.all([
     supabase
       .from("transactions")
       .select(
@@ -65,10 +66,16 @@ export async function loadReview(supabase: Supabase, spaceId: string): Promise<R
       .lte("occurred_on", today)
       .limit(5000),
     supabase.from("categories").select("id,name").eq("space_id", spaceId).limit(1000),
+    supabase
+      .from("reviewed_movements")
+      .select("transaction_id,rule_id")
+      .eq("space_id", spaceId)
+      .limit(5000),
   ]);
   for (const [label, error] of [
     ["movimientos", rows.error],
     ["categorías", categories.error],
+    ["revisados", reviewed.error],
   ] as const) {
     if (error) {
       logger.error("db.query_failed", { code: `${label}:${error.code}` });
@@ -90,10 +97,16 @@ export async function loadReview(supabase: Supabase, spaceId: string): Promise<R
       })),
     );
   const { value, explanation } = detectAnomalies(movements, today, space.base_currency);
+  const done = new Set(
+    z
+      .array(reviewedRow)
+      .parse(reviewed.data ?? [])
+      .map((r) => `${r.transaction_id}:${r.rule_id}`),
+  );
   return {
     space,
     today,
-    anomalies: value,
+    anomalies: value.filter((a) => !done.has(`${a.movementId}:${a.ruleId}`)),
     categoryNames: new Map(
       z
         .array(categoryRow)

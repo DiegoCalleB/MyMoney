@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { money } from "@mymoney/finance-core";
 import { z } from "zod";
 import { Amount } from "@/components/amount";
+import { markReviewedAction } from "@/app/actions/review";
 import { formatMoney } from "@/lib/format";
 import { t } from "@/lib/i18n";
 import { requireReadyUser } from "@/server/auth";
@@ -59,6 +60,14 @@ export default async function ReviewPage({ params }: { params: Promise<{ spaceId
                 </span>
                 <span className={shell.amountCol}>
                   <Amount value={a.amount} />
+                  <form action={markReviewedAction}>
+                    <input type="hidden" name="spaceId" value={space.id} />
+                    <input type="hidden" name="transactionId" value={a.movementId} />
+                    <input type="hidden" name="ruleId" value={a.ruleId} />
+                    <button type="submit" className={shell.chip}>
+                      {t("review.recognize")}
+                    </button>
+                  </form>
                 </span>
               </li>
             );

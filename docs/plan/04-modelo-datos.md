@@ -244,6 +244,7 @@ Ejemplos:
 |-------|----------|---------------|
 | `import_mappings` | `space_id`, `name`, `institution_hint`, `mapping jsonb` (columnas, formato de fecha, separador decimal, signo) | |
 | `import_batches` | `account_id`, `file_sha256 bytea`, `storage_path`, `row_count`, `status` (`previewed`, `committed`, `reverted`), `mapping_id` | único (`space_id`, `account_id`, `file_sha256`) |
+| `reviewed_movements` | `transaction_id`, `rule_id` (`possible_duplicate`, `recurring_change`, `unusual_amount`), `entered_by` | único (`space_id`, `transaction_id`, `rule_id`); solo se inserta y se borra |
 | `import_rows` | `batch_id`, `row_index`, `fingerprint bytea`, `status` (`new`, `duplicate`, `error`, `imported`), `error_code`, `transaction_id null` | único (`space_id`, `account_id`, `fingerprint`) solo para filas `imported` (índice parcial) |
 
 Huella de fila: `SHA-256(account_id ‖ occurred_on ‖ amount_minor ‖ currency ‖ descripción normalizada ‖ saldo posterior si existe ‖ ordinal de ocurrencia)`. El ordinal distingue dos movimientos legítimamente idénticos el mismo día (por ejemplo, dos cafés de 2,50 €): es el número de veces que esa misma tupla aparece antes **dentro del archivo**. Ver ADR-0008 para sus límites.

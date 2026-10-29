@@ -11,6 +11,7 @@ import { groupAccounts } from "@/server/group-accounts";
 import { buildSlices, type SliceInput } from "@/server/chart-model";
 import { requireReadyUser } from "@/server/auth";
 import { loadHome } from "@/server/queries/home";
+import { loadReview } from "@/server/queries/review";
 import { noticeParams } from "@/server/home-model";
 import styles from "../../../../page.module.css";
 import shell from "../../../shell.module.css";
@@ -23,7 +24,11 @@ export default async function HomePage({ params }: { params: Promise<{ spaceId: 
   const spaceId = parsed.data;
 
   const { supabase } = await requireReadyUser();
-  const data = await loadHome(supabase, spaceId);
+  const [data, review] = await Promise.all([
+    loadHome(supabase, spaceId),
+    // El aviso de cargos por revisar es accesorio: si falla, Inicio sigue funcionando.
+    loadReview(supabase, spaceId).catch(() => null),
+  ]);
   if (!data) notFound();
 
   const { space, result } = data;
@@ -306,6 +311,9 @@ export default async function HomePage({ params }: { params: Promise<{ spaceId: 
           </Link>
           <Link className={styles.secondary} href={`/s/${spaceId}/revisar`}>
             {t("review.link")}
+            {review && review.anomalies.length > 0
+              ? ` · ${t("review.badge", { count: String(review.anomalies.length) })}`
+              : ""}
           </Link>
           <Link className={styles.secondary} href={`/s/${spaceId}/importar`}>
             {t("import.link")}
