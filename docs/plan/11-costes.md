@@ -23,7 +23,7 @@
 | Limitador / clave-valor | 0 (Postgres) | 0-10 USD | 10-30 USD |
 | IA (si se activa) | — | < 10 USD (uso bajo) | Según uso; medir coste por aviso explicado |
 | Precios de mercado con licencia | — | — | Muy variable (de 0 con fuentes oficiales limitadas a cientos al mes) [A VERIFICAR] |
-| Agregador PSD2 | — | — | Por conexión o por usuario; pedir ofertas. Hay informaciones no oficiales de que GoCardless Bank Account Data (antes Nordigen) cerró las altas nuevas [A VERIFICAR] ([DEV Community](https://dev.to/johnfrandsen/gocardless-bank-account-data-alternatives-what-to-use-when-signups-are-disabled-326d)) |
+| Agregador PSD2 | — | — | Por conexión o por usuario; pedir ofertas. GoCardless Bank Account Data (antes Nordigen) no admite altas nuevas desde julio de 2025 ([aviso oficial](https://bankaccountdata.gocardless.com/new-signups-disabled)). Enable Banking: gratis para cuentas propias, precio por volumen en producción [A VERIFICAR] (capítulo 16) |
 | Pagos (fase 3) | — | — | Comisión por transacción del proveedor |
 | **Total infraestructura mensual** | **~0-40 USD** | **~150-200 USD con PITR / ~50-90 USD sin PITR** | **~250-500 USD** |
 

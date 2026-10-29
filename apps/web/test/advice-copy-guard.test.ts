@@ -7,7 +7,14 @@ import { esES } from "@/messages/es-ES";
  * ni de «test de idoneidad» salvo para negarlo.
  */
 const KEYS = Object.keys(esES).filter(
-  (k) => k.startsWith("advice.") || k.startsWith("returns.") || k.startsWith("anomaly."),
+  (k) =>
+    k.startsWith("advice.") ||
+    k.startsWith("returns.") ||
+    k.startsWith("income.") ||
+    k.startsWith("benchmark.") ||
+    k.startsWith("tax.") ||
+    k.startsWith("exposure.") ||
+    k.startsWith("anomaly."),
 );
 
 const ENTITIES =

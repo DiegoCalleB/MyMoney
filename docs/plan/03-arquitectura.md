@@ -92,6 +92,7 @@ Todas están en [`docs/adr`](../adr/). Resumen:
 | [0011](../adr/0011-modulos-flags-i18n.md) | Módulos, *feature flags* e i18n | Propuesto |
 | [0012](../adr/0012-cifrado-y-minimizacion.md) | Minimizar en lugar de cifrar campo a campo en el MVP | Propuesto |
 | [0013](../adr/0013-monorepo-pnpm.md) | Monorepo con `pnpm` *workspaces*, sin orquestador adicional | Propuesto |
+| [0022](../adr/0022-conexiones-automaticas.md) | Conexiones automáticas (PSD2 y APIs) como lotes de importación, cola en Postgres y bóveda con cifrado de sobre | Propuesto |
 
 ## Alternativas consideradas a tu preferencia de partida
 

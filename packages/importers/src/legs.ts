@@ -1,5 +1,5 @@
 import type { CalendarDate, CurrencyCode } from "@mymoney/finance-core";
-import type { NormalizedRow } from "./rows";
+import type { FlowKind, NormalizedRow } from "./rows";
 
 export interface LegPayload {
   readonly role: "cash" | "external";
@@ -12,7 +12,7 @@ export interface LegPayload {
 }
 
 export interface TransactionPayload {
-  readonly kind: "income" | "expense";
+  readonly kind: FlowKind;
   readonly occurredOn: CalendarDate;
   readonly description: string | null;
   readonly legs: readonly [LegPayload, LegPayload];
@@ -20,13 +20,14 @@ export interface TransactionPayload {
 
 /**
  * Un apunte de cuenta como ingreso o gasto sin categoría: una pata de efectivo en la cuenta y
- * una pata externa de signo contrario, de modo que cuadra por moneda (ADR-0006). Los traspasos
+ * una pata externa de signo contrario, de modo que cuadra por moneda (ADR-0006). Una plantilla de
+ * entidad puede fijar el tipo (aportación, retirada, dividendo, interés). Los traspasos
  * entre cuentas propias no se detectan: aparecen como ingreso y gasto.
  */
 export function toTransactionPayload(row: NormalizedRow, accountId: string): TransactionPayload {
   const { minor, currency } = row.amount;
   return {
-    kind: minor > 0n ? "income" : "expense",
+    kind: row.kind ?? (minor > 0n ? "income" : "expense"),
     occurredOn: row.date,
     description: row.description === "" ? null : row.description,
     legs: [

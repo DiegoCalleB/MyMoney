@@ -122,6 +122,26 @@ Las reglas no producen texto libre: devuelven claves de mensaje y parámetros, y
 
 Reglas del MVP: `emergency_fund_gap`, `idle_cash`, `speculative_cap`, `high_fees`, `concentration_asset`, `concentration_institution`, `currency_exposure`, `goal_at_risk`, `stale_valuations`, `expensive_debt_with_idle_cash`, `profile_expired`.
 
+## Exposición real, cobros y comparación con una referencia (octubre de 2026)
+
+Tres funciones de `finance-core`, con ejemplos, propiedades y cobertura total. Todas devuelven `{ value, explanation }` o un `Result` con código estable, y reciben «hoy» por parámetro.
+
+**`exposure` (mirar dentro de los fondos).** Reparte el valor de cada posición según la última composición publicada no posterior a hoy (`asset_compositions`, pesos en puntos básicos) y suma por clave. El reparto usa `allocate` (resto mayor), de modo que *clasificado + sin clasificar = total*, al céntimo. No supone lo que no sabe: una posición sin composición y la parte que una composición parcial no cubre quedan «sin clasificar», y la explicación lo dice (`exposure.caveat.missing_composition`, `partial_composition`, `old_composition` si tiene más de 400 días). Rechaza monedas distintas, valores negativos y pesos fuera de rango. *Estado de la interfaz:* aún sin pantalla; ver [capítulo 17](17-estado-integraciones-y-pendientes.md), §3.
+
+**`incomeCalendar` (dividendos e intereses).** Desglose mensual de los últimos N meses naturales (los vacíos, a cero) y total del último año = eventos de los últimos 365 días contando hoy. La rentabilidad por cobros es *cobrado en el último año / valor de las cuentas de efectivo e inversión*. La cifra «próximo año» es **una estimación explícita** (repite lo cobrado) y no una previsión: el cobro futuro no se inventa. Admite correcciones negativas.
+
+**`compareWithBenchmark` (tu cuenta frente a una referencia).** Aplica a la referencia las mismas aportaciones y retiradas en las mismas fechas: cada flujo F con precio P (último conocido en esa fecha o antes) suma F/P participaciones; hoy se valoran al último precio. Un único redondeo al céntimo al final. Falla con código si falta precio a la fecha de un flujo (`benchmark.no_price`) o si una retirada excede lo que habría (`benchmark.oversold`). Es información histórica, no una recomendación.
+
+Propiedades añadidas: clasificado + sin clasificar = total; ningún cubo es negativo; el orden de entrada no cambia el resultado; el total del último año suma exactamente los cobros de esos 365 días; cada mes es dividendos + intereses; con precio constante la referencia vale lo aportado (± 1 unidad mínima); escalar los flujos por k escala la referencia (± k unidades mínimas).
+
+### Fiscalidad informativa implementada (octubre de 2026)
+
+`savingsTax`, `pensionRoom` y `transferVsSale` (`finance-core/src/tax.ts`), sin ninguna cifra legal en el código: escala y límite llegan como parámetros con `ParameterSource` (ejercicio, URL y fecha de verificación) desde `ref.tax_parameters`, y la explicación los repite.
+- **`savingsTax`**: escala progresiva por tramos; una pérdida no paga (la compensación no se modela y se dice); redondeo al céntimo por tramo. Propiedades: la cuota no es negativa ni supera el tipo máximo; las bases de los tramos suman la ganancia positiva; es monótona.
+- **`pensionRoom`**: límite − aportado del ejercicio (solo entradas); informa del exceso. No separa sublímites (aportaciones de la empresa) y lo avisa.
+- **`transferVsSale`**: con datos escritos por la persona (comisiones actual y de destino), compara traspaso (sin impuesto ahora) y venta (impuesto sobre la ganancia a nivel de cuenta). El ahorro anual es *diferencia de comisión × dinero que cambia de producto*, no una resta de comisiones absolutas (que sería engañosa al quedar menos capital tras pagar el impuesto): una propiedad lo detectó. Años para compensar = impuesto / ahorro anual, o «no compensa». Supuestos visibles: comisiones constantes, sin rentabilidad, ganancia a nivel de cuenta, traspaso sin tributación inmediata [A VERIFICAR], sin regla de recompra.
+- No implementado: `foreignAssetsThreshold` (modelos 720/721, necesita país por cuenta) ni lotes FIFO (HU-33).
+
 ## Estrategia de tests
 
 | Tipo | Herramienta | Qué cubre | Umbral |

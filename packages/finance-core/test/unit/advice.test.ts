@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_ADVICE_THRESHOLDS,
+  THRESHOLD_ASSUMPTION_KEYS,
+  THRESHOLD_FIELDS,
+  calendarDate,
   evaluateAdvice,
   money,
+  thresholdsFrom,
   type AdviceAccount,
   type AdviceInput,
 } from "../../src";
@@ -156,5 +160,132 @@ describe("evaluateAdvice", () => {
     expect(f.map((x) => x.severity)).toEqual(
       ["important", "important", "attention", "info"].slice(0, f.length),
     );
+  });
+});
+
+describe("evaluateAdvice: tope especulativo y operaciones vencidas", () => {
+  const pockets = (speculative: bigint, other = 0n): NonNullable<AdviceInput["pockets"]> => [
+    { pocketId: "apuestas", riskLevel: "speculative", value: eur(speculative) },
+    { pocketId: "largo", riskLevel: "medium", value: eur(other) },
+  ];
+  const base = [acc("a", 10_000n)];
+
+  it("avisa cuando los bolsillos especulativos superan el umbral y gradúa la severidad", () => {
+    const attention = evaluateAdvice(input(base, { pockets: pockets(700n) }));
+    expect(attention[0]).toMatchObject({
+      ruleId: "speculative_cap",
+      severity: "attention",
+      params: { shareBps: "700", limitBps: "500" },
+      assumptionsUsed: ["speculative_share_bps"],
+    });
+    const important = evaluateAdvice(input(base, { pockets: pockets(1200n) }));
+    expect(important[0]?.severity).toBe("important");
+  });
+
+  it("no avisa en el umbral exacto, sin bolsillos o con importes no positivos", () => {
+    expect(ids(input(base, { pockets: pockets(500n) }))).not.toContain("advice.speculative_cap");
+    expect(ids(input(base))).not.toContain("advice.speculative_cap");
+    expect(ids(input(base, { pockets: pockets(-300n) }))).not.toContain("advice.speculative_cap");
+  });
+
+  it("el umbral lo pone la persona", () => {
+    const strict = { ...DEFAULT_ADVICE_THRESHOLDS, speculativeShareBps: 100 };
+    expect(ids(input(base, { pockets: pockets(200n), thresholds: strict }))).toContain(
+      "advice.speculative_cap",
+    );
+  });
+
+  const date = (value: string) => calendarDate(value);
+  const schedule = (pending: string[], onDate = "2026-10-28") => ({
+    onDate: date(onDate),
+    pending: pending.map(date),
+  });
+
+  it("avisa de las operaciones planificadas con fecha pasada y cuenta el retraso", () => {
+    const [finding] = evaluateAdvice(
+      input([], { schedule: schedule(["2026-10-20", "2026-10-18", "2026-11-05", "2026-10-28"]) }),
+    );
+    expect(finding).toMatchObject({
+      ruleId: "planned_operation_due",
+      severity: "info",
+      params: { count: "2", days: "10" },
+    });
+  });
+
+  it("una operación con más de dos semanas de retraso pide atención", () => {
+    const [finding] = evaluateAdvice(input([], { schedule: schedule(["2026-10-01"]) }));
+    expect(finding?.severity).toBe("attention");
+    const [recent] = evaluateAdvice(input([], { schedule: schedule(["2026-10-14"]) }));
+    expect(recent?.severity).toBe("info");
+  });
+
+  it("sin vencidas o sin calendario no avisa", () => {
+    expect(ids(input([], { schedule: schedule(["2026-10-28", "2026-12-01"]) }))).toEqual([]);
+    expect(ids(input([], { schedule: schedule([]) }))).toEqual([]);
+    expect(ids(input([]))).toEqual([]);
+  });
+});
+
+describe("thresholdsFrom", () => {
+  const row = (key: string, value: string) => ({ key, value });
+
+  it("sin supuestos usa los valores por defecto", () => {
+    expect(thresholdsFrom([])).toEqual({ thresholds: DEFAULT_ADVICE_THRESHOLDS, ignored: [] });
+  });
+
+  it("aplica los supuestos válidos (también con decimales a cero, como los devuelve la base de datos)", () => {
+    const { thresholds, ignored } = thresholdsFrom([
+      row("speculative_share_bps", "300.0000000000"),
+      row("institution_share_bps", "2500"),
+      row("liquid_share_bps", "0"),
+      row("runway_min_months", "4"),
+      row("runway_max_months", "24"),
+    ]);
+    expect(thresholds).toEqual({
+      speculativeShareBps: 300,
+      institutionShareBps: 2500,
+      liquidShareBps: 0,
+      runwayMinMonths: 4,
+      runwayMaxMonths: 24,
+    });
+    expect(ignored).toEqual([]);
+  });
+
+  it("ignora y dice lo que no es entero o está fuera de rango", () => {
+    const { thresholds, ignored } = thresholdsFrom([
+      row("speculative_share_bps", "12.5"),
+      row("institution_share_bps", "10001"),
+      row("liquid_share_bps", "-1"),
+      row("runway_max_months", "abc"),
+      row("otra_cosa", "5"),
+    ]);
+    expect(thresholds).toEqual(DEFAULT_ADVICE_THRESHOLDS);
+    expect(ignored).toEqual([
+      "speculative_share_bps",
+      "institution_share_bps",
+      "liquid_share_bps",
+      "runway_max_months",
+    ]);
+  });
+
+  it("un mínimo de meses que no es menor que el máximo se ignora junto con su pareja", () => {
+    const { thresholds, ignored } = thresholdsFrom([
+      row("runway_min_months", "12"),
+      row("runway_max_months", "6"),
+    ]);
+    expect(thresholds.runwayMinMonths).toBe(DEFAULT_ADVICE_THRESHOLDS.runwayMinMonths);
+    expect(thresholds.runwayMaxMonths).toBe(DEFAULT_ADVICE_THRESHOLDS.runwayMaxMonths);
+    expect(ignored).toEqual(["runway_min_months", "runway_max_months"]);
+  });
+
+  it("las claves y rangos están descritos para la interfaz", () => {
+    expect(THRESHOLD_ASSUMPTION_KEYS).toEqual([
+      "speculative_share_bps",
+      "institution_share_bps",
+      "liquid_share_bps",
+      "runway_min_months",
+      "runway_max_months",
+    ]);
+    expect(THRESHOLD_FIELDS.liquidShareBps).toMatchObject({ unit: "bps", min: 0, max: 10_000 });
   });
 });

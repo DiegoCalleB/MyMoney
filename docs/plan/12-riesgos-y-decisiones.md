@@ -15,7 +15,7 @@
 | R9 | **Dependencia de un proveedor** (Supabase, hosting) | Medio | Baja | Postgres estándar, migraciones SQL propias, sin funciones exclusivas en el dominio; plan B autoalojado documentado | Cambios de precio o condiciones |
 | R10 | **Alcance que crece** (módulos personales, IA, app nativa) | Medio | Alta | Hoja de ruta con criterios de salida; "qué no haremos"; módulos detrás de *flags* | Funciones de fase 2-3 colándose en el MVP |
 | R11 | **Datos de menores tratados indebidamente** | Alto | Baja | Sin usuarios menores; datos mínimos; consulta legal | Petición de acceso para los hijos |
-| R12 | **Disponibilidad de agregadores PSD2 y precios de mercado** | Medio | Media | Fuera del MVP; evaluación en la fase 3 con ofertas reales | — |
+| R12 | **Disponibilidad de agregadores PSD2 y precios de mercado** | Medio | Media | Enable Banking en producción restringida para uso propio; contrato y oferta real antes de abrir a terceros (capítulo 16, ADR-0022) | Una entidad deja de aparecer en el agregador o cambia sus condiciones |
 | R13 | **Tiempo disponible** | Medio | Alta | Fases cortas con valor propio; el MVP te sirve aunque nunca llegue la fase 3 | Iteraciones que se alargan más del doble |
 
 ## Decisiones pendientes (por impacto)

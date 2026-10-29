@@ -87,7 +87,14 @@ export const fxRow = z.object({
 
 export const institutionRow = z.object({ id: z.uuid(), name: z.string() });
 
-export const pocketRow = z.object({ id: z.uuid(), name: z.string() });
+export const pocketRow = z.object({
+  id: z.uuid(),
+  name: z.string(),
+  risk_level: z.enum(["none", "low", "medium", "high", "speculative"]),
+});
+
+/** Operación planificada pendiente: solo su fecha, para avisar de las vencidas. */
+export const plannedPendingRow = z.object({ planned_on: date });
 
 export const allocationRow = z.object({
   pocket_id: z.uuid(),
@@ -251,4 +258,29 @@ export type ExternalFlowRow = z.infer<typeof externalFlowRow>;
 export const expenseAssumptionRow = z.object({
   value: decimalText,
   currency,
+});
+
+/** Dividendo o interés cobrado en una cuenta (`account_income_events`). */
+export const incomeEventRow = z.object({
+  account_id: z.uuid(),
+  occurred_on: date,
+  kind: z.enum(["dividend", "interest"]),
+  currency,
+  amount_minor: bigintValue,
+});
+export type IncomeEventRow = z.infer<typeof incomeEventRow>;
+
+/** Precio de un instrumento en un día (vista `prices`, datos públicos de mercado). */
+export const priceRow = z.object({
+  instrument: z.string().regex(/^[A-Z0-9.:_-]{2,30}$/),
+  as_of: date,
+  price: decimalText,
+  currency,
+});
+export type PriceRow = z.infer<typeof priceRow>;
+
+/** Umbral de avisos guardado como supuesto (`assumptions`): clave y valor como texto. */
+export const thresholdRow = z.object({
+  key: z.string(),
+  value: decimalText,
 });
