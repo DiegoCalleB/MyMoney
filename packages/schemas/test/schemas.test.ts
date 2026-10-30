@@ -14,6 +14,10 @@ import {
   signInInput,
   signUpInput,
   totpCodeInput,
+  assistantInput,
+  pathSimulatorInput,
+  ASSISTANT_MAX_MESSAGE,
+  ASSISTANT_MAX_TURNS,
 } from "../src";
 
 const firstError = (r: { success: boolean; error?: { issues: { message: string }[] } }) =>
@@ -237,5 +241,71 @@ describe("importBatchInput", () => {
     expect(firstError(importBatchInput.safeParse({ spaceId: id, batchId: "no" }))).toBe(
       "validation.invalid_id",
     );
+  });
+});
+
+describe("assistantInput", () => {
+  const spaceId = "0ecffd10-756b-4ef2-a197-1773972b8e6b";
+  const user = (content: string) => ({ role: "user" as const, content });
+
+  it("acepta una conversación que termina con una pregunta", () => {
+    const ok = assistantInput.parse({
+      spaceId,
+      messages: [
+        user("hola"),
+        { role: "assistant", content: "¿en qué te ayudo?" },
+        user(" y ahora "),
+      ],
+    });
+    expect(ok.messages.at(-1)?.content).toBe("y ahora");
+  });
+
+  it("rechaza lo vacío, lo largo, lo que no acaba en pregunta y lo interminable", () => {
+    expect(firstError(assistantInput.safeParse({ spaceId, messages: [user("  ")] }))).toBe(
+      "assistant.message_empty",
+    );
+    expect(firstError(assistantInput.safeParse({ spaceId, messages: [] }))).toBe(
+      "assistant.message_empty",
+    );
+    expect(
+      firstError(
+        assistantInput.safeParse({
+          spaceId,
+          messages: [user("x".repeat(ASSISTANT_MAX_MESSAGE + 1))],
+        }),
+      ),
+    ).toBe("assistant.message_too_long");
+    expect(
+      firstError(
+        assistantInput.safeParse({
+          spaceId,
+          messages: [user("hola"), { role: "assistant", content: "hola" }],
+        }),
+      ),
+    ).toBe("assistant.invalid_conversation");
+    expect(
+      firstError(
+        assistantInput.safeParse({
+          spaceId,
+          messages: Array.from({ length: ASSISTANT_MAX_TURNS + 1 }, () => user("a")),
+        }),
+      ),
+    ).toBe("assistant.conversation_too_long");
+  });
+});
+
+describe("pathSimulatorInput", () => {
+  it("convierte el texto de la URL y aplica límites", () => {
+    expect(
+      pathSimulatorInput.parse({ amount: "10.000", months: "12", annualReturn: "7", drop: "20" }),
+    ).toEqual({ amount: "10.000", months: 12, annualReturn: 7, drop: 20 });
+    expect(
+      pathSimulatorInput.safeParse({ amount: "1", months: "1", annualReturn: "7", drop: "20" })
+        .success,
+    ).toBe(false);
+    expect(
+      pathSimulatorInput.safeParse({ amount: "1", months: "12", annualReturn: "70", drop: "20" })
+        .success,
+    ).toBe(false);
   });
 });

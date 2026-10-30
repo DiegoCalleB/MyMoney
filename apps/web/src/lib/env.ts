@@ -81,3 +81,23 @@ export function readMfaRequired(source: Record<string, string | undefined> = pro
   const value = source.MFA_REQUIRED?.trim().toLowerCase();
   return !(value === "false" || value === "0" || value === "no");
 }
+
+export interface AssistantEnv {
+  readonly apiKey: string;
+  readonly model: string;
+}
+
+/** Modelo por defecto del asistente; se puede cambiar con `ASSISTANT_MODEL` sin tocar el código. */
+export const DEFAULT_ASSISTANT_MODEL = "claude-sonnet-5-5";
+
+/**
+ * Configuración del asistente (ADR-0025). Solo existe en el servidor: la clave no lleva prefijo
+ * `NEXT_PUBLIC_` y nunca llega al navegador. `null` si falta: la pantalla avisa y el resto sigue.
+ */
+export function readAssistantEnv(
+  source: Record<string, string | undefined> = process.env,
+): AssistantEnv | null {
+  const apiKey = source.ANTHROPIC_API_KEY?.trim();
+  if (!apiKey || apiKey.length < 20) return null;
+  return { apiKey, model: source.ASSISTANT_MODEL?.trim() || DEFAULT_ASSISTANT_MODEL };
+}

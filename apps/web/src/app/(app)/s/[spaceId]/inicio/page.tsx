@@ -318,6 +318,9 @@ export default async function HomePage({ params }: { params: Promise<{ spaceId: 
               ? ` · ${t("review.badge", { count: String(review.anomalies.length) })}`
               : ""}
           </Link>
+          <Link className={styles.secondary} href={`/s/${spaceId}/asistente`}>
+            {t("assistant.link")}
+          </Link>
           <Link className={styles.secondary} href={`/s/${spaceId}/importar`}>
             {t("import.link")}
           </Link>

@@ -6,6 +6,7 @@ const PROTECTED = [
   "/verificar-mfa",
   "/s/00000000-0000-4000-8000-000000000000/inicio",
   "/s/00000000-0000-4000-8000-000000000000/cuentas/nueva",
+  "/s/00000000-0000-4000-8000-000000000000/asistente",
 ];
 
 for (const path of PROTECTED) {
