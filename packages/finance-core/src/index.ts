@@ -13,3 +13,4 @@ export * from "./exposure";
 export * from "./income";
 export * from "./benchmark";
 export * from "./tax";
+export * from "./assistant-facts";
