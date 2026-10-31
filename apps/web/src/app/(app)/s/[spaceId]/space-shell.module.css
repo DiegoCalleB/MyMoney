@@ -1,0 +1,12 @@
+.shell {
+  display: flex;
+  flex-direction: column;
+  /* Deja sitio a la barra inferior fija del móvil. */
+  padding-bottom: calc(72px + env(safe-area-inset-bottom));
+}
+
+@media (min-width: 48rem) {
+  .shell {
+    padding-bottom: 0;
+  }
+}
