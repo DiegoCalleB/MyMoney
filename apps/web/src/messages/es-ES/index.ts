@@ -130,6 +130,18 @@ export const esES = {
   "spaces.create.failed": "No hemos podido crear el hogar. Inténtalo de nuevo.",
 
   "home.title": "Tu patrimonio",
+  "home.change.since": "desde el cierre del {date}",
+  "home.kpi.liquid": "Disponible",
+  "home.kpi.invested": "En inversiones",
+  "home.kpi.coverage": "Gastos cubiertos",
+  "home.kpi.coverage_value": "{months} meses",
+  "home.kpi.coverage_hint": "con lo disponible de inmediato",
+  "home.kpi.coverage_none": "Indica tu gasto mensual en Más → Supuestos",
+  "home.evolution.title": "Evolución del patrimonio",
+  "home.evolution.series": "Patrimonio",
+  "home.evolution.private": "Modo privado: la gráfica con importes está oculta.",
+  "home.evolution.note":
+    "Cada mes usa tus últimas valoraciones de cada cuenta. Una cuenta sin valoración todavía no cuenta, y los movimientos posteriores a una valoración no se aplican hacia atrás.",
   "home.total": "Patrimonio neto",
   "home.assets": "Lo que tienes",
   "home.liabilities": "Lo que debes",

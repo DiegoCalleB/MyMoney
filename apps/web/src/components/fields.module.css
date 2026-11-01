@@ -76,6 +76,7 @@
 }
 
 .submit {
+  box-shadow: var(--shadow);
   min-height: 44px;
   padding: var(--space-2) var(--space-4);
   border: 0;
