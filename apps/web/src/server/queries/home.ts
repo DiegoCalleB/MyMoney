@@ -1,16 +1,5 @@
 import "server-only";
-import {
-  THRESHOLD_ASSUMPTION_KEYS,
-  thresholdsFrom,
-  type AdviceThresholds,
-  addDays,
-  calendarDate,
-  evaluateAdvice,
-  money,
-  netWorth,
-  type Finding,
-  type NetWorthResult,
-} from "@mymoney/finance-core";
+import { THRESHOLD_ASSUMPTION_KEYS, addDays } from "@mymoney/finance-core";
 import { z } from "zod";
 import { calendarDateInZone } from "@/lib/dates";
 import { logger } from "@/lib/logger";
@@ -18,7 +7,6 @@ import {
   accountRow,
   allocationRow,
   balanceRow,
-  buildHomeModel,
   foreignCurrencies,
   fxRow,
   institutionRow,
@@ -31,12 +19,9 @@ import {
   pocketRow,
   spaceRow,
   valuationRow,
-  type AccountMeta,
-  type NoticeRow,
   type SpaceRow,
 } from "@/server/home-model";
-import { buildReturns, type ReturnsModel } from "@/server/returns-model";
-import { buildNetWorthHistory, type HistoryPoint } from "@/server/history-model";
+import { assembleHome, type HomeData } from "@/server/home-assemble";
 import type { createSupabaseServerClient } from "@/server/supabase";
 
 type Supabase = Awaited<ReturnType<typeof createSupabaseServerClient>>;
@@ -44,23 +29,7 @@ type Supabase = Awaited<ReturnType<typeof createSupabaseServerClient>>;
 /** Cuántos días atrás se buscan tipos de cambio; más antiguos se tratan como no disponibles. */
 const FX_WINDOW_DAYS = 45;
 
-export interface HomeData {
-  readonly space: SpaceRow;
-  readonly today: string;
-  readonly result: NetWorthResult;
-  readonly accounts: ReadonlyMap<string, AccountMeta>;
-  readonly pockets: ReadonlyMap<string, string>;
-  readonly institutions: ReadonlyMap<string, string>;
-  readonly returns: ReturnsModel;
-  readonly findings: readonly Finding[];
-  /** Gasto mensual indicado por la persona (supuesto), si lo hay. */
-  readonly monthlyExpense: ReturnType<typeof money> | null;
-  readonly notices: readonly NoticeRow[];
-  /** Umbrales de los avisos: los de la persona (supuestos) o los valores por defecto. */
-  readonly thresholds: AdviceThresholds;
-  /** Patrimonio a final de cada uno de los últimos meses, según tus valoraciones. */
-  readonly history: readonly HistoryPoint[];
-}
+export type { HomeData };
 
 function check<T>(label: string, error: { code?: string } | null, data: T): T {
   if (error) {
@@ -197,97 +166,33 @@ export async function loadHome(supabase: Supabase, spaceId: string): Promise<Hom
     fxRows = z.array(fxRow).parse(check("tipos de cambio", fx.error, fx.data ?? []));
   }
 
-  const model = buildHomeModel(
-    {
-      space,
-      accounts: accountRows,
-      balances: z.array(balanceRow).parse(check("saldos", balances.error, balances.data ?? [])),
-      valuations: valuationRows,
-      movementsAfter,
-      fxRates: fxRows,
-      allocations: z
-        .array(allocationRow)
-        .parse(check("repartos", allocations.error, allocations.data ?? [])),
-    },
-    today,
-  );
-
-  const result = netWorth(model.input);
-  const expenseRow = z
-    .array(expenseAssumptionRow)
-    .parse(check("supuestos", expense.error, expense.data ?? []))[0];
-  const monthlyExpense = expenseRow
-    ? money(BigInt(expenseRow.value.split(".")[0] ?? "0"), expenseRow.currency)
-    : null;
-  const pocketRows = z
-    .array(pocketRow)
-    .parse(check("bolsillos", pockets.error, pockets.data ?? []));
-  const pocketValues = new Map(result.value.byPocket.map((p) => [p.pocketId, p.value]));
-  const plannedRows = z
-    .array(plannedPendingRow)
-    .parse(check("operaciones planificadas", planned.error, planned.data ?? []));
-  // El valor vigente de cada umbral es el de fecha más reciente (la consulta ya viene ordenada).
-  const thresholds = thresholdsFrom(
-    z
-      .array(thresholdRow)
-      .parse(check("umbrales", thresholdRows.error, thresholdRows.data ?? []))
-      .map((r) => ({ key: r.key, value: r.value })),
-  ).thresholds;
-  const findings = evaluateAdvice({
-    baseCurrency: space.base_currency,
-    accounts: result.explanation.accounts.flatMap((line) => {
-      const meta = model.accounts.get(line.accountId);
-      return meta
-        ? [
-            {
-              accountId: line.accountId,
-              institutionId: meta.institutionId,
-              kind: meta.kind,
-              value: line.contribution,
-              ageDays: line.ageDays,
-              stale: line.stale,
-            },
-          ]
-        : [];
-    }),
-    monthlyExpense,
-    thresholds,
-    pockets: pocketRows.flatMap((p) => {
-      const value = pocketValues.get(p.id);
-      return value ? [{ pocketId: p.id, riskLevel: p.risk_level, value }] : [];
-    }),
-    schedule: { onDate: calendarDate(today), pending: plannedRows.map((r) => r.planned_on) },
-  });
-  return {
+  return assembleHome({
     space,
     today,
-    result,
-    findings,
-    thresholds,
-    monthlyExpense,
-    returns: buildReturns(
-      flowRows,
-      result.explanation.accounts,
-      new Map(
-        accountRows.map((a) => [a.id, { currency: a.currency, isLiability: a.is_liability }]),
-      ),
-      space.base_currency,
-      today,
-    ),
-    accounts: model.accounts,
-    pockets: new Map(pocketRows.map((p) => [p.id, p.name])),
-    institutions: new Map(
-      z
-        .array(institutionRow)
-        .parse(check("entidades", institutions.error, institutions.data ?? []))
-        .map((i) => [i.id, i.name]),
-    ),
+    accounts: accountRows,
+    balances: z.array(balanceRow).parse(check("saldos", balances.error, balances.data ?? [])),
+    valuations: valuationRows,
+    movementsAfter,
+    flows: flowRows,
+    fxRates: fxRows,
+    allocations: z
+      .array(allocationRow)
+      .parse(check("repartos", allocations.error, allocations.data ?? [])),
+    pockets: z.array(pocketRow).parse(check("bolsillos", pockets.error, pockets.data ?? [])),
+    institutions: z
+      .array(institutionRow)
+      .parse(check("entidades", institutions.error, institutions.data ?? [])),
     notices: z.array(noticeRow).parse(check("avisos", notices.error, notices.data ?? [])),
-    history: buildNetWorthHistory(
-      { space, accounts: accountRows, valuations: valuationRows, fxRates: fxRows },
-      calendarDate(today),
-    ),
-  };
+    expense: z
+      .array(expenseAssumptionRow)
+      .parse(check("supuestos", expense.error, expense.data ?? [])),
+    planned: z
+      .array(plannedPendingRow)
+      .parse(check("operaciones planificadas", planned.error, planned.data ?? [])),
+    thresholds: z
+      .array(thresholdRow)
+      .parse(check("umbrales", thresholdRows.error, thresholdRows.data ?? [])),
+  });
 }
 
 export type AccountOption = z.infer<typeof accountRow>;

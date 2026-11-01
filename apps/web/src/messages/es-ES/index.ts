@@ -317,6 +317,13 @@ export const esES = {
   "spend.next": "Mes siguiente",
   "spend.history": "Mes a mes",
   "spend.income_empty": "Sin ingresos este mes.",
+  "demo.title": "Demo con datos de ejemplo",
+  "demo.banner": "Demo con datos ficticios.",
+  "demo.banner.body": "Es el mismo inicio que ves al entrar, sobre un hogar inventado.",
+  "demo.sign_in": "Entrar",
+  "demo.footer":
+    "Los importes, cuentas y entidades de esta página son inventados. MyMoney ofrece información y herramientas de cálculo; no recomienda productos concretos.",
+  "landing.demo": "Ver la demo",
   "assistant.title": "Asistente educativo",
   "assistant.link": "Asistente educativo",
   "assistant.intro":
@@ -439,6 +446,8 @@ export const esES = {
     "Lo que está en otra moneda se convierte con el último tipo de cambio publicado hasta esa fecha.",
   "net_worth.unallocated_to_unassigned":
     "Lo que no está repartido entre bolsillos aparece como «sin asignar».",
+  "net_worth.account_share_applied":
+    "En las cuentas compartidas solo cuenta tu parte, el porcentaje que indicaste.",
   "net_worth.no_value": "falta un valor",
   "fx.rate_not_found": "falta el tipo de cambio",
 

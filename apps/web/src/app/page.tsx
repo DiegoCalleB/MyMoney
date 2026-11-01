@@ -14,6 +14,9 @@ export default function LandingPage() {
         <Link className={styles.secondary} href="/entrar">
           {t("landing.sign_in")}
         </Link>
+        <Link className={styles.secondary} href="/demo">
+          {t("landing.demo")}
+        </Link>
       </div>
       <p className={styles.note}>{t("app.disclaimer")}</p>
     </main>
