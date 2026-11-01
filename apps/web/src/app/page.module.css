@@ -4,9 +4,15 @@
   padding: var(--space-5) var(--space-3);
 }
 
+.wide {
+  max-width: 76rem;
+}
+
 .title {
   font-size: clamp(1.75rem, 5vw, 2.5rem);
   line-height: 1.15;
+  letter-spacing: -0.025em;
+  font-weight: 800;
   margin: 0 0 var(--space-3);
 }
 
@@ -36,11 +42,18 @@
 .primary {
   background: var(--accent);
   color: var(--accent-text);
+  box-shadow: var(--shadow);
+  transition: filter 0.15s ease;
+}
+
+.primary:hover {
+  filter: brightness(1.08);
 }
 
 .secondary {
   border: 2px solid var(--accent);
   color: var(--accent);
+  background: var(--surface);
 }
 
 .note {

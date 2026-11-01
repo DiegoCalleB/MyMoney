@@ -36,6 +36,7 @@ import {
   type SpaceRow,
 } from "@/server/home-model";
 import { buildReturns, type ReturnsModel } from "@/server/returns-model";
+import { buildNetWorthHistory, type HistoryPoint } from "@/server/history-model";
 import type { createSupabaseServerClient } from "@/server/supabase";
 
 type Supabase = Awaited<ReturnType<typeof createSupabaseServerClient>>;
@@ -57,6 +58,8 @@ export interface HomeData {
   readonly notices: readonly NoticeRow[];
   /** Umbrales de los avisos: los de la persona (supuestos) o los valores por defecto. */
   readonly thresholds: AdviceThresholds;
+  /** Patrimonio a final de cada uno de los últimos meses, según tus valoraciones. */
+  readonly history: readonly HistoryPoint[];
 }
 
 function check<T>(label: string, error: { code?: string } | null, data: T): T {
@@ -280,6 +283,10 @@ export async function loadHome(supabase: Supabase, spaceId: string): Promise<Hom
         .map((i) => [i.id, i.name]),
     ),
     notices: z.array(noticeRow).parse(check("avisos", notices.error, notices.data ?? [])),
+    history: buildNetWorthHistory(
+      { space, accounts: accountRows, valuations: valuationRows, fxRates: fxRows },
+      calendarDate(today),
+    ),
   };
 }
 
