@@ -15,6 +15,8 @@ import {
   signUpInput,
   totpCodeInput,
   assistantInput,
+  newPasswordInput,
+  resetRequestInput,
   pathSimulatorInput,
   ASSISTANT_MAX_MESSAGE,
   ASSISTANT_MAX_TURNS,
@@ -307,5 +309,26 @@ describe("pathSimulatorInput", () => {
       pathSimulatorInput.safeParse({ amount: "1", months: "12", annualReturn: "70", drop: "20" })
         .success,
     ).toBe(false);
+  });
+});
+
+describe("recuperar la contraseña", () => {
+  it("normaliza el correo y rechaza uno no válido", () => {
+    expect(resetRequestInput.parse({ email: "  Ana@Ejemplo.ES " }).email).toBe("ana@ejemplo.es");
+    expect(firstError(resetRequestInput.safeParse({ email: "no" }))).toBe(
+      "validation.email_invalid",
+    );
+  });
+
+  it("la nueva contraseña sigue la misma política que al registrarse", () => {
+    expect(newPasswordInput.parse({ password: "una frase larga" }).password).toBe(
+      "una frase larga",
+    );
+    expect(firstError(newPasswordInput.safeParse({ password: "corta" }))).toBe(
+      "validation.password_too_short",
+    );
+    expect(firstError(newPasswordInput.safeParse({ password: "x".repeat(129) }))).toBe(
+      "validation.password_too_long",
+    );
   });
 });

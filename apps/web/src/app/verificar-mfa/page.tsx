@@ -8,10 +8,15 @@ import { TotpForm } from "./totp-form";
 
 export const metadata: Metadata = { title: t("mfa.verify.title") };
 
-export default async function VerifyMfaPage() {
+export default async function VerifyMfaPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string }>;
+}) {
+  const { next } = await searchParams;
   const state = await getAuthState();
   if (state.kind === "anonymous") redirect("/entrar");
-  if (state.kind === "ready") redirect("/hogares");
+  if (state.kind === "ready") redirect(next === "restablecer" ? "/restablecer" : "/hogares");
   if (state.kind === "enroll") redirect("/seguridad/mfa");
 
   const { data } = await state.supabase.auth.mfa.listFactors();
@@ -22,7 +27,11 @@ export default async function VerifyMfaPage() {
     <main id="contenido" className={styles.main}>
       <h1 className={styles.title}>{t("mfa.verify.title")}</h1>
       <p className={styles.lead}>{t("mfa.verify.intro")}</p>
-      <TotpForm factorId={factor.id} submitLabel={t("mfa.verify.submit")} />
+      <TotpForm
+        factorId={factor.id}
+        submitLabel={t("mfa.verify.submit")}
+        {...(next === "restablecer" ? { after: "restablecer" as const } : {})}
+      />
       <form action={signOutAction} className={styles.links}>
         <button type="submit" className={styles.secondary}>
           {t("common.sign_out")}

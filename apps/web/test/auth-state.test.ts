@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decideSession } from "@/lib/auth-state";
+import { callbackDestination, decideSession } from "@/lib/auth-state";
 
 describe("decideSession", () => {
   it("con segundo factor ya verificado entra", () => {
@@ -11,5 +11,13 @@ describe("decideSession", () => {
   it("sin factores obliga a activar el segundo factor", () => {
     expect(decideSession("aal1", "aal1")).toBe("enroll");
     expect(decideSession(null, null)).toBe("enroll");
+  });
+});
+
+describe("callbackDestination", () => {
+  it("lleva a elegir contraseña solo si se pidió recuperarla en este navegador", () => {
+    expect(callbackDestination("1")).toBe("/restablecer");
+    expect(callbackDestination(undefined)).toBe("/hogares");
+    expect(callbackDestination("otra-cosa")).toBe("/hogares");
   });
 });
