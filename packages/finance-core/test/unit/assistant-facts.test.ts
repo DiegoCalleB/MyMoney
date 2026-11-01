@@ -30,16 +30,26 @@ describe("profileFacts", () => {
     expect(explanation.assumptions).toContain("profile_facts.stress_is_illustrative_not_forecast");
   });
 
+  it("lo disponible por encima del colchón es dinero sin destino", () => {
+    // 20 000 € disponibles, 2 000 € al mes y colchón de 12 meses (24 000 €): nada por encima.
+    expect(profileFacts(base).value.idle?.minor).toBe(0n);
+    // Con 6 meses de colchón (12 000 €) sobran 8 000 €.
+    expect(profileFacts({ ...base, cushionMonths: 6 }).value.idle?.minor).toBe(800_000n);
+    // Con más disponible que el colchón.
+    expect(profileFacts({ ...base, liquid: eur(3_000_000n) }).value.idle?.minor).toBe(600_000n);
+  });
+
   it("sin gasto conocido no calcula meses y baja la calidad", () => {
     const { value, explanation } = profileFacts({ ...base, monthlyExpense: null });
     expect(value.liquidityMonthsTenths).toBeNull();
+    expect(value.idle).toBeNull();
     expect(explanation.dataQuality).toBe("low");
   });
 
-  it("un gasto de cero tampoco da meses", () => {
-    expect(
-      profileFacts({ ...base, monthlyExpense: eur(0n) }).value.liquidityMonthsTenths,
-    ).toBeNull();
+  it("un gasto de cero tampoco da meses ni dinero sin destino", () => {
+    const { value } = profileFacts({ ...base, monthlyExpense: eur(0n) });
+    expect(value.liquidityMonthsTenths).toBeNull();
+    expect(value.idle).toBeNull();
   });
 
   it("sin patrimonio positivo no hay porcentajes", () => {

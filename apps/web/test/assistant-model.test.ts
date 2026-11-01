@@ -89,11 +89,19 @@ describe("factsBlock", () => {
     const text = factsBlock({ ...base, monthlyExpense, expenseOrigin: "assumption", facts });
     expect(text).toContain("100.500,00"); // 100 499,99 € redondeado al centenar
     expect(text).toContain("10,0 meses");
+    expect(text).toContain("dinero sin destino definido): 0,00");
     expect(text).toContain("indicado por la persona");
     expect(text).toContain("caída del 30 %: 14,9 % del patrimonio");
     expect(factsBlock({ ...base, monthlyExpense, expenseOrigin: "measured", facts })).toContain(
       "media de los últimos meses completos",
     );
+  });
+
+  it("con más disponible que el colchón, da el dinero sin destino definido", () => {
+    const monthlyExpense = eur(100_000n); // 1 000 € al mes: colchón de 12 meses = 12 000 €
+    const facts = profileFacts({ ...base, monthlyExpense }).value; // 20 000 € disponibles
+    const text = factsBlock({ ...base, monthlyExpense, expenseOrigin: "assumption", facts });
+    expect(text).toContain("dinero sin destino definido): 8.000,00");
   });
 
   it("sin gasto conocido lo dice y redondea también los negativos", () => {
@@ -141,6 +149,8 @@ describe("guardReply", () => {
   it("las instrucciones del modelo prohíben recomendar operar y elegir el momento", () => {
     expect(ASSISTANT_SYSTEM_PROMPT).toMatch(/Nunca digas si conviene comprar/);
     expect(ASSISTANT_SYSTEM_PROMPT).toMatch(/Nunca nombres productos/);
+    expect(ASSISTANT_SYSTEM_PROMPT).toMatch(/diagnóstico claro/);
+    expect(ASSISTANT_SYSTEM_PROMPT).toMatch(/no digas qué opción es mejor/);
   });
 });
 

@@ -23,6 +23,7 @@ describe("adviceParams", () => {
         limitBps: "4000",
         months: "49.1",
         expense: "150000",
+        excess: "1800000",
         limitMonths: "12",
         count: "2",
       }),
@@ -32,6 +33,7 @@ describe("adviceParams", () => {
     expect(out.limit).toBe("12");
     expect(out.months).toBe("49,1");
     expect(out.expense?.replace(/\s/g, " ")).toBe("1.500,00 €");
+    expect(out.excess?.replace(/\s/g, " ")).toBe("18.000,00 €");
     expect(out.count).toBe("2");
     const pct = adviceParams(finding({ limitBps: "4000" }), "EUR");
     expect(pct.limit?.replace(/\s/g, " ")).toBe("40 %");

@@ -196,7 +196,7 @@ export const esES = {
   "advice.runway_low":
     "Tu efectivo y tus cuentas de ahorro cubren unos {months} meses de gastos, con los {expense} al mes que indicaste. Tu umbral de aviso es de {limit} meses.",
   "advice.runway_high":
-    "Tu efectivo y tus cuentas de ahorro cubren unos {months} meses de gastos, con los {expense} al mes que indicaste, por encima de tu umbral de {limit} meses. Puede ser un buen momento para revisar qué parte necesitas a corto plazo.",
+    "Tu efectivo y tus cuentas de ahorro cubren unos {months} meses de gastos, con los {expense} al mes que indicaste. Unos {excess} superan tu umbral de {limit} meses: es dinero sin un destino definido. Merece la pena decidir para qué lo quieres (reserva, un objetivo con fecha o una inversión a largo plazo) y en qué plazo; la decisión es tuya y el asistente puede ayudarte a ver las opciones.",
   "advice.speculative_cap":
     "Tus bolsillos de riesgo especulativo suponen el {share} de tu patrimonio, por encima del {limit} que tú fijaste. Es un hecho sobre tus propios datos; qué hacer con él lo decides tú.",
   "advice.planned_due":
@@ -356,6 +356,8 @@ export const esES = {
   "assistant.chat.you": "Tú",
   "assistant.chat.bot": "Asistente",
   "assistant.chat.suggestions": "Ideas para empezar",
+  "assistant.suggest.review": "Revisa mi cartera y dime qué ves",
+  "assistant.suggest.idle": "¿Qué opciones tengo con el dinero que tengo parado?",
   "assistant.suggest.when": "¿Cuándo conviene invertir en un índice amplio como el S&P 500?",
   "assistant.suggest.before": "¿Qué miro antes de invertir una cantidad grande?",
   "assistant.suggest.lump": "¿Aportar de golpe o poco a poco?",

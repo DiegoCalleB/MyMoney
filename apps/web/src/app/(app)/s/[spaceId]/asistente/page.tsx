@@ -69,6 +69,8 @@ export default async function AssistantPage({
     : null;
 
   const suggestions = [
+    t("assistant.suggest.review"),
+    t("assistant.suggest.idle"),
     t("assistant.suggest.when"),
     t("assistant.suggest.before"),
     t("assistant.suggest.lump"),
