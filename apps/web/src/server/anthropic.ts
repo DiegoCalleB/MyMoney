@@ -1,17 +1,13 @@
 import "server-only";
 import type { AssistantEnv } from "@/lib/env";
+import type { LlmResult, LlmTurn } from "@/server/llm-types";
 
 const ENDPOINT = "https://api.anthropic.com/v1/messages";
 const TIMEOUT_MS = 30_000;
 const MAX_TOKENS = 700;
 
-export type ClaudeResult =
-  { readonly ok: true; readonly text: string } | { readonly ok: false; readonly code: string };
-
-interface Turn {
-  readonly role: "user" | "assistant";
-  readonly content: string;
-}
+export type ClaudeResult = LlmResult;
+type Turn = LlmTurn;
 
 /**
  * Pregunta a Claude por HTTP, sin SDK (una dependencia menos, regla 11). Devuelve solo el texto o

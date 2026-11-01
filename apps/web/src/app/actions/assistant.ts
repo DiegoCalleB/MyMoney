@@ -9,7 +9,7 @@ import {
   factsBlock,
   guardReply,
 } from "@/server/assistant-model";
-import { askClaude } from "@/server/anthropic";
+import { askModel } from "@/server/llm";
 import { requireReadyUser } from "@/server/auth";
 import { loadAssistantFacts } from "@/server/queries/assistant";
 
@@ -38,7 +38,7 @@ export async function askAssistantAction(raw: AssistantInput): Promise<Assistant
   if (!data) return { ok: false, error: "assistant.failed" };
 
   const started = Date.now();
-  const answer = await askClaude(
+  const answer = await askModel(
     env,
     `${ASSISTANT_SYSTEM_PROMPT}\n\n${factsBlock(data.source)}`,
     parsed.data.messages,

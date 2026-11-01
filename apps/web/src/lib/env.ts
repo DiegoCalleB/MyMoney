@@ -82,22 +82,45 @@ export function readMfaRequired(source: Record<string, string | undefined> = pro
   return !(value === "false" || value === "0" || value === "no");
 }
 
+export type AssistantProvider = "anthropic" | "gemini";
+
 export interface AssistantEnv {
+  readonly provider: AssistantProvider;
   readonly apiKey: string;
   readonly model: string;
 }
 
-/** Modelo por defecto del asistente; se puede cambiar con `ASSISTANT_MODEL` sin tocar el código. */
-export const DEFAULT_ASSISTANT_MODEL = "claude-sonnet-5-5";
+/** Modelo por defecto de cada servicio; se cambia con `ASSISTANT_MODEL` sin tocar el código. */
+export const DEFAULT_ASSISTANT_MODELS: Readonly<Record<AssistantProvider, string>> = {
+  anthropic: "claude-sonnet-5-5",
+  gemini: "gemini-3.8-flash",
+};
+
+const MIN_KEY_LENGTH = 20;
 
 /**
- * Configuración del asistente (ADR-0025). Solo existe en el servidor: la clave no lleva prefijo
- * `NEXT_PUBLIC_` y nunca llega al navegador. `null` si falta: la pantalla avisa y el resto sigue.
+ * Configuración del asistente (ADR-0025). Solo existe en el servidor: las claves no llevan prefijo
+ * `NEXT_PUBLIC_` y nunca llegan al navegador. Sirve `GEMINI_API_KEY` o `ANTHROPIC_API_KEY`; con
+ * las dos, gana Gemini salvo que `ASSISTANT_PROVIDER=anthropic`. `null` si no hay ninguna: la
+ * pantalla avisa y el resto sigue funcionando.
  */
 export function readAssistantEnv(
   source: Record<string, string | undefined> = process.env,
 ): AssistantEnv | null {
-  const apiKey = source.ANTHROPIC_API_KEY?.trim();
-  if (!apiKey || apiKey.length < 20) return null;
-  return { apiKey, model: source.ASSISTANT_MODEL?.trim() || DEFAULT_ASSISTANT_MODEL };
+  const keys: Record<AssistantProvider, string | undefined> = {
+    gemini: source.GEMINI_API_KEY?.trim(),
+    anthropic: source.ANTHROPIC_API_KEY?.trim(),
+  };
+  const usable = (provider: AssistantProvider) => (keys[provider]?.length ?? 0) >= MIN_KEY_LENGTH;
+  const preferred: AssistantProvider =
+    source.ASSISTANT_PROVIDER?.trim().toLowerCase() === "anthropic" ? "anthropic" : "gemini";
+  const other: AssistantProvider = preferred === "gemini" ? "anthropic" : "gemini";
+  const provider = usable(preferred) ? preferred : usable(other) ? other : null;
+  const apiKey = provider ? keys[provider] : undefined;
+  if (!provider || !apiKey) return null;
+  return {
+    provider,
+    apiKey,
+    model: source.ASSISTANT_MODEL?.trim() || DEFAULT_ASSISTANT_MODELS[provider],
+  };
 }

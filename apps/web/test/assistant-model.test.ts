@@ -1,6 +1,6 @@
 import { calendarDate, money, profileFacts, type AccountLine } from "@mymoney/finance-core";
-import { describe, expect, it } from "vitest";
-import { DEFAULT_ASSISTANT_MODEL, readAssistantEnv } from "@/lib/env";
+import { describe, expect, it, vi } from "vitest";
+import { DEFAULT_ASSISTANT_MODELS, readAssistantEnv } from "@/lib/env";
 import {
   ASSISTANT_SYSTEM_PROMPT,
   averageMonthlyExpense,
@@ -9,7 +9,9 @@ import {
   factsBlock,
   guardReply,
 } from "@/server/assistant-model";
-import { extractText } from "@/server/anthropic";
+import { askClaude, extractText } from "@/server/anthropic";
+import { askGemini, extractGeminiText } from "@/server/gemini";
+import { askModel } from "@/server/llm";
 import type { AccountMeta } from "@/server/home-model";
 
 const eur = (minor: bigint) => money(minor, "EUR");
@@ -154,15 +156,45 @@ describe("createRateLimiter", () => {
 });
 
 describe("readAssistantEnv", () => {
-  const key = ["sk", "ant", "x".repeat(24)].join("-");
-  it("exige una clave razonable y usa el modelo por defecto", () => {
+  const fake = (name: string) => [name, "x".repeat(24)].join("-");
+  const gemini = fake("g");
+  const claude = fake("c");
+
+  it("sin clave razonable no hay asistente", () => {
     expect(readAssistantEnv({})).toBeNull();
-    expect(readAssistantEnv({ ANTHROPIC_API_KEY: "corta" })).toBeNull();
-    expect(readAssistantEnv({ ANTHROPIC_API_KEY: ` ${key} ` })).toEqual({
-      apiKey: key,
-      model: DEFAULT_ASSISTANT_MODEL,
+    expect(readAssistantEnv({ GEMINI_API_KEY: "corta", ANTHROPIC_API_KEY: " " })).toBeNull();
+  });
+
+  it("usa Gemini o Claude según la clave que haya, con su modelo por defecto", () => {
+    expect(readAssistantEnv({ GEMINI_API_KEY: ` ${gemini} ` })).toEqual({
+      provider: "gemini",
+      apiKey: gemini,
+      model: DEFAULT_ASSISTANT_MODELS.gemini,
     });
-    expect(readAssistantEnv({ ANTHROPIC_API_KEY: key, ASSISTANT_MODEL: " otro " })?.model).toBe(
+    expect(readAssistantEnv({ ANTHROPIC_API_KEY: claude })).toEqual({
+      provider: "anthropic",
+      apiKey: claude,
+      model: DEFAULT_ASSISTANT_MODELS.anthropic,
+    });
+  });
+
+  it("con las dos claves gana Gemini, salvo que se pida Claude", () => {
+    const both = { GEMINI_API_KEY: gemini, ANTHROPIC_API_KEY: claude };
+    expect(readAssistantEnv(both)?.provider).toBe("gemini");
+    expect(readAssistantEnv({ ...both, ASSISTANT_PROVIDER: " Anthropic " })?.provider).toBe(
+      "anthropic",
+    );
+    // Si la preferida no tiene clave, se usa la otra.
+    expect(
+      readAssistantEnv({ ANTHROPIC_API_KEY: claude, ASSISTANT_PROVIDER: "gemini" })?.provider,
+    ).toBe("anthropic");
+    expect(
+      readAssistantEnv({ GEMINI_API_KEY: gemini, ASSISTANT_PROVIDER: "anthropic" })?.provider,
+    ).toBe("gemini");
+  });
+
+  it("el modelo se puede cambiar", () => {
+    expect(readAssistantEnv({ GEMINI_API_KEY: gemini, ASSISTANT_MODEL: " otro " })?.model).toBe(
       "otro",
     );
   });
@@ -184,5 +216,92 @@ describe("extractText", () => {
     expect(extractText({ content: [] })).toEqual({ ok: false, code: "empty" });
     expect(extractText({ content: "x" })).toEqual({ ok: false, code: "bad_shape" });
     expect(extractText(null)).toEqual({ ok: false, code: "bad_shape" });
+  });
+});
+
+describe("extractGeminiText", () => {
+  const reply = (...texts: unknown[]) => ({
+    candidates: [{ content: { parts: texts.map((text) => ({ text })) } }],
+  });
+
+  it("une las partes de texto de la primera respuesta", () => {
+    expect(extractGeminiText(reply("Hola ", 7, "mundo"))).toEqual({ ok: true, text: "Hola mundo" });
+  });
+
+  it("distingue lo bloqueado, lo vacío y lo mal formado", () => {
+    expect(extractGeminiText({ promptFeedback: { blockReason: "SAFETY" } })).toEqual({
+      ok: false,
+      code: "blocked_by_provider",
+    });
+    expect(extractGeminiText(reply(""))).toEqual({ ok: false, code: "empty" });
+    expect(extractGeminiText({ candidates: [] })).toEqual({ ok: false, code: "bad_shape" });
+    expect(extractGeminiText(null)).toEqual({ ok: false, code: "bad_shape" });
+  });
+});
+
+describe("llamadas a los servicios de IA", () => {
+  const messages = [
+    { role: "user", content: "hola" },
+    { role: "assistant", content: "¿en qué te ayudo?" },
+    { role: "user", content: "mi patrimonio" },
+  ] as const;
+  const lastCall = (fetcher: { mock: { calls: Parameters<typeof fetch>[] } }) => {
+    const [url, init] = fetcher.mock.calls[0] ?? [];
+    return {
+      url: typeof url === "string" ? url : "",
+      headers: (init?.headers ?? {}) as Record<string, string>,
+      body: typeof init?.body === "string" ? init.body : "",
+    };
+  };
+  const respond = (body: unknown, status = 200) =>
+    vi.fn<typeof fetch>(() => Promise.resolve(new Response(JSON.stringify(body), { status })));
+
+  it("Gemini: clave en la cabecera, modelo en la ruta y turnos user/model", async () => {
+    const fetcher = respond({ candidates: [{ content: { parts: [{ text: "ok" }] } }] });
+    const env = { provider: "gemini", apiKey: "k".repeat(24), model: "gemini-x" } as const;
+    expect(await askModel(env, "sistema", messages, fetcher)).toEqual({ ok: true, text: "ok" });
+    const call = lastCall(fetcher);
+    expect(call.url).toBe(
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-x:generateContent",
+    );
+    expect(call.url).not.toContain(env.apiKey);
+    expect(call.headers["x-goog-api-key"]).toBe(env.apiKey);
+    const body = JSON.parse(call.body) as {
+      system_instruction: { parts: { text: string }[] };
+      contents: { role: string }[];
+    };
+    expect(body.system_instruction.parts[0]?.text).toBe("sistema");
+    expect(body.contents.map((c) => c.role)).toEqual(["user", "model", "user"]);
+  });
+
+  it("Claude: clave y versión en cabeceras y mensajes tal cual", async () => {
+    const fetcher = respond({ content: [{ type: "text", text: "ok" }] });
+    const env = { provider: "anthropic", apiKey: "k".repeat(24), model: "claude-x" } as const;
+    expect(await askModel(env, "sistema", messages, fetcher)).toEqual({ ok: true, text: "ok" });
+    const call = lastCall(fetcher);
+    expect(call.url).toBe("https://api.anthropic.com/v1/messages");
+    expect(call.headers["x-api-key"]).toBe(env.apiKey);
+    const body = JSON.parse(call.body) as { model: string; messages: unknown[] };
+    expect(body.model).toBe("claude-x");
+    expect(body.messages).toHaveLength(3);
+  });
+
+  it.each([askGemini, askClaude])("un error HTTP o de red solo da un código", async (ask) => {
+    const env = { provider: "gemini", apiKey: "k".repeat(24), model: "m" } as const;
+    expect(await ask(env, "s", messages, respond({ error: "secreto" }, 429))).toEqual({
+      ok: false,
+      code: "http_429",
+    });
+    expect(
+      await ask(
+        env,
+        "s",
+        messages,
+        vi.fn<typeof fetch>(() => Promise.reject(new Error("x"))),
+      ),
+    ).toEqual({
+      ok: false,
+      code: "network",
+    });
   });
 });
