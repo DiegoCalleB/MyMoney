@@ -239,13 +239,19 @@ export function evaluateAdvice(input: AdviceInput): Finding[] {
           assumptionsUsed: ["monthly_expense", "runway_min_months"],
         });
       } else if (months.gt(new Decimal(thresholds.runwayMaxMonths))) {
+        // Lo disponible por encima del colchón que tú fijaste: dinero sin destino definido.
+        const excess = liquid - BigInt(thresholds.runwayMaxMonths) * expense.minor;
         findings.push({
           ruleId: "emergency_runway",
           version: 1,
           level: 2,
-          severity: "info",
+          severity: "attention",
           messageKey: "advice.runway_high",
-          params: { ...params, limitMonths: String(thresholds.runwayMaxMonths) },
+          params: {
+            ...params,
+            limitMonths: String(thresholds.runwayMaxMonths),
+            excess: excess.toString(),
+          },
           confidence: "medium",
           inputsUsed: ["accounts.kind", "accounts.value"],
           assumptionsUsed: ["monthly_expense", "runway_max_months"],

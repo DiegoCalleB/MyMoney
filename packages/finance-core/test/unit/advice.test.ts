@@ -106,8 +106,9 @@ describe("evaluateAdvice", () => {
     ).find((f) => f.ruleId === "emergency_runway");
     expect(high).toMatchObject({
       messageKey: "advice.runway_high",
-      severity: "info",
-      params: { months: "30.0", limitMonths: "12" },
+      severity: "attention",
+      // 30 000 € disponibles menos 12 meses de 1 000 €: 18 000 € por encima del colchón.
+      params: { months: "30.0", limitMonths: "12", excess: "1800000" },
     });
     // Dentro del rango razonable: sin aviso de colchón.
     expect(

@@ -21,6 +21,8 @@ export interface ProfileFactsInput {
   readonly risk: Money;
   /** Gasto mensual supuesto o medido; `null` si no se conoce. */
   readonly monthlyExpense: Money | null;
+  /** Meses de gasto que se consideran colchón; lo disponible por encima no tiene destino. Por defecto 12. */
+  readonly cushionMonths?: number;
 }
 
 export interface StressScenario {
@@ -36,6 +38,11 @@ export interface ProfileFacts {
   readonly riskShareBps: number | null;
   /** Meses de gasto que cubre lo disponible de inmediato, en décimas; `null` sin gasto conocido. */
   readonly liquidityMonthsTenths: bigint | null;
+  /**
+   * Disponible por encima del colchón (`cushionMonths` meses de gasto): dinero sin destino
+   * definido. Cero si no llega al colchón; `null` sin gasto conocido.
+   */
+  readonly idle: Money | null;
   readonly stress: readonly StressScenario[];
 }
 
@@ -51,7 +58,7 @@ export function profileFacts(input: ProfileFactsInput): {
   readonly value: ProfileFacts;
   readonly explanation: ProfileFactsExplanation;
 } {
-  const { total, liquid, risk, monthlyExpense } = input;
+  const { total, liquid, risk, monthlyExpense, cushionMonths = 12 } = input;
   // Lanza si las monedas no coinciden: nada se suma sin conversión explícita.
   sum([liquid, risk, ...(monthlyExpense ? [monthlyExpense] : [])], total.currency);
 
@@ -71,6 +78,15 @@ export function profileFacts(input: ProfileFactsInput): {
         monthlyExpense && monthlyExpense.minor > 0n
           ? (liquid.minor * 10n) / monthlyExpense.minor
           : null,
+      idle:
+        monthlyExpense && monthlyExpense.minor > 0n
+          ? money(
+              liquid.minor > BigInt(cushionMonths) * monthlyExpense.minor
+                ? liquid.minor - BigInt(cushionMonths) * monthlyExpense.minor
+                : 0n,
+              liquid.currency,
+            )
+          : null,
       stress,
     },
     explanation: {
@@ -79,6 +95,7 @@ export function profileFacts(input: ProfileFactsInput): {
       assumptions: [
         "profile_facts.risk_is_brokerage_fund_crypto",
         "profile_facts.liquid_is_cash_current_savings",
+        "profile_facts.idle_is_liquid_above_cushion",
         "profile_facts.stress_is_illustrative_not_forecast",
       ],
       dataQuality: positive && monthlyExpense !== null ? "high" : "low",
