@@ -10,13 +10,12 @@ const email = z
   .toLowerCase()
   .pipe(z.email({ error: "validation.email_invalid" }));
 
-export const signUpInput = z.object({
-  email,
-  password: z
-    .string()
-    .min(PASSWORD_MIN_LENGTH, { error: "validation.password_too_short" })
-    .max(PASSWORD_MAX_LENGTH, { error: "validation.password_too_long" }),
-});
+const newPassword = z
+  .string()
+  .min(PASSWORD_MIN_LENGTH, { error: "validation.password_too_short" })
+  .max(PASSWORD_MAX_LENGTH, { error: "validation.password_too_long" });
+
+export const signUpInput = z.object({ email, password: newPassword });
 export type SignUpInput = z.infer<typeof signUpInput>;
 
 /** Al iniciar sesión no se revela la política: cualquier fallo da el mismo mensaje neutro. */
@@ -37,3 +36,11 @@ export const totpCodeInput = z.object({
     .regex(/^\d{6}$/, { error: "validation.totp_invalid" }),
 });
 export type TotpCodeInput = z.infer<typeof totpCodeInput>;
+
+/** Recuperar la contraseña: solo el correo. La respuesta es la misma exista o no la cuenta. */
+export const resetRequestInput = z.object({ email });
+export type ResetRequestInput = z.infer<typeof resetRequestInput>;
+
+/** Nueva contraseña elegida tras abrir el enlace del correo: misma política que al registrarse. */
+export const newPasswordInput = z.object({ password: newPassword });
+export type NewPasswordInput = z.infer<typeof newPasswordInput>;

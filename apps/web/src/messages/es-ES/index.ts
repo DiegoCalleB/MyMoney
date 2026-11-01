@@ -94,6 +94,23 @@ export const esES = {
   "auth.check_email.title": "Revisa tu correo",
   "auth.check_email.body":
     "Si el correo es válido, te hemos enviado un enlace para confirmar la cuenta. Ábrelo en este mismo navegador.",
+  "auth.forgot.link": "¿Has olvidado tu contraseña?",
+  "auth.forgot.title": "Recupera tu contraseña",
+  "auth.forgot.intro":
+    "Escribe tu correo y te enviaremos un enlace para elegir una contraseña nueva.",
+  "auth.forgot.submit": "Enviar enlace",
+  "auth.forgot.back": "Volver a entrar",
+  "auth.forgot.failed": "No hemos podido enviar el enlace ahora. Inténtalo de nuevo más tarde.",
+  "auth.forgot.sent":
+    "Si hay una cuenta con ese correo, te hemos enviado un enlace para elegir una contraseña nueva. Ábrelo en este mismo navegador y en este mismo dispositivo. Puede tardar unos minutos y caduca en una hora.",
+  "auth.reset.title": "Elige una contraseña nueva",
+  "auth.reset.intro":
+    "Usa una frase larga o deja que tu gestor de contraseñas la genere. Puedes verla con el ojo antes de guardarla.",
+  "auth.reset.label": "Contraseña nueva",
+  "auth.reset.submit": "Guardar contraseña",
+  "auth.reset.same_password": "La contraseña nueva debe ser distinta de la anterior.",
+  "auth.reset.failed":
+    "No hemos podido cambiar la contraseña. Pide un enlace nuevo e inténtalo de nuevo.",
   "auth.sign_in.title": "Entrar",
   "auth.sign_in.submit": "Entrar",
   "auth.sign_in.no_account": "¿No tienes cuenta?",

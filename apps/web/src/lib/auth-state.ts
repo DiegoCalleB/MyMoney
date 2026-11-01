@@ -20,3 +20,14 @@ export const ROUTE_FOR_STATE = {
   verify: "/verificar-mfa",
   enroll: "/seguridad/mfa",
 } as const satisfies Record<Exclude<SessionState, "ready">, string>;
+
+/** Cookie que marca «he pedido recuperar la contraseña en este navegador» (el enlace usa PKCE). */
+export const RECOVERY_COOKIE = "mm_recovery";
+
+/**
+ * Adónde lleva el enlace del correo tras canjear el código. Solo hay dos destinos fijos: nunca se
+ * toma una dirección de la petición (evita redirecciones abiertas).
+ */
+export function callbackDestination(recoveryFlag: string | undefined): "/restablecer" | "/hogares" {
+  return recoveryFlag === "1" ? "/restablecer" : "/hogares";
+}

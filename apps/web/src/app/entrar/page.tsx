@@ -17,6 +17,9 @@ export default async function SignInPage({
       <h1 className={styles.title}>{t("auth.sign_in.title")}</h1>
       <SignInForm {...(error === "callback" ? { initialError: "auth.callback_failed" } : {})} />
       <p className={styles.links}>
+        <Link href="/recuperar">{t("auth.forgot.link")}</Link>
+      </p>
+      <p className={styles.links}>
         {t("auth.sign_in.no_account")} <Link href="/registro">{t("landing.sign_up")}</Link>
       </p>
     </main>

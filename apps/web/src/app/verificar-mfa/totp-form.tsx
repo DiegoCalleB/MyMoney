@@ -11,15 +11,19 @@ import { t } from "@/lib/i18n";
 export function TotpForm({
   factorId,
   submitLabel,
+  after,
 }: {
   readonly factorId: string;
   readonly submitLabel: string;
+  /** Pantalla a la que volver tras verificar (solo «restablecer»). */
+  readonly after?: "restablecer";
 }) {
   const [state, action] = useActionState(verifyTotpAction, INITIAL_FORM_STATE);
   return (
     <form className={styles.form} action={action}>
       <FormAlert error={state.error} />
       <input type="hidden" name="factorId" value={factorId} />
+      {after ? <input type="hidden" name="after" value={after} /> : null}
       <Field
         id="code"
         name="code"

@@ -64,5 +64,6 @@ export async function verifyTotpAction(
     logger.warn("mfa.verify_failed", { code: error.code ?? "unknown", status: error.status ?? 0 });
     return { error: "mfa.verify.wrong" };
   }
-  redirect("/hogares");
+  // Único destino alternativo permitido: terminar de cambiar la contraseña.
+  redirect(formText(formData, "after") === "restablecer" ? "/restablecer" : "/hogares");
 }

@@ -5,11 +5,18 @@ import styles from "../page.module.css";
 
 export const metadata: Metadata = { title: t("auth.check_email.title") };
 
-export default function CheckEmailPage() {
+export default async function CheckEmailPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tipo?: string }>;
+}) {
+  const { tipo } = await searchParams;
   return (
     <main id="contenido" className={styles.main}>
       <h1 className={styles.title}>{t("auth.check_email.title")}</h1>
-      <p className={styles.lead}>{t("auth.check_email.body")}</p>
+      <p className={styles.lead}>
+        {t(tipo === "recuperar" ? "auth.forgot.sent" : "auth.check_email.body")}
+      </p>
       <Link className={styles.secondary} href="/entrar">
         {t("auth.sign_in.title")}
       </Link>

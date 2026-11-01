@@ -8,6 +8,7 @@ const PROTECTED = [
   "/s/00000000-0000-4000-8000-000000000000/cuentas/nueva",
   "/s/00000000-0000-4000-8000-000000000000/asistente",
   "/s/00000000-0000-4000-8000-000000000000/mas",
+  "/restablecer",
 ];
 
 for (const path of PROTECTED) {
@@ -58,4 +59,24 @@ test("una página inexistente da un 404 amable y accesible", async ({ page }) =>
   expect(response?.status()).toBe(404);
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await expectAccessible(page);
+});
+
+test("desde entrar se llega a recuperar la contraseña, accesible y con el correo", async ({
+  page,
+  consoleErrors,
+}) => {
+  await page.goto("/entrar");
+  await page.getByRole("link", { name: "¿Has olvidado tu contraseña?" }).click();
+  await expect(page).toHaveURL(/\/recuperar$/);
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Recupera tu contraseña" }),
+  ).toBeVisible();
+  await expect(page.getByLabel("Correo electrónico")).toHaveAttribute("autocomplete", "email");
+  await expectAccessible(page);
+  expect(consoleErrors).toEqual([]);
+});
+
+test("el aviso de enlace enviado pide abrirlo en el mismo navegador", async ({ page }) => {
+  await page.goto("/verifica-correo?tipo=recuperar");
+  await expect(page.getByText("en este mismo navegador y en este mismo dispositivo")).toBeVisible();
 });
