@@ -46,3 +46,16 @@ test("la comprobación de salud responde sin cookies ni datos", async ({ request
   expect(response.headers()["set-cookie"]).toBeUndefined();
   expect(response.headers()["cache-control"]).toBe("no-store");
 });
+
+test("la demo se ve sin sesión, con datos ficticios, evolución y avisos", async ({
+  page,
+  consoleErrors,
+}) => {
+  await page.goto("/demo");
+  await expect(page.getByRole("note").first()).toContainText("Demo con datos ficticios");
+  await expect(page.getByRole("heading", { level: 1, name: "Hogar de ejemplo" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Evolución del patrimonio" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Patrimonio neto" })).toBeVisible();
+  await expectAccessible(page);
+  expect(consoleErrors).toEqual([]);
+});
